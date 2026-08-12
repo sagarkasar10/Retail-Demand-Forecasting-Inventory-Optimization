@@ -1,9 +1,36 @@
 """
-This module validates whether the expected columns exist
-and whether basic data types are appropriate.
+Schema validation functions for the M5 datasets.
 """
 
 import pandas as pd
+
+
+SALES_REQUIRED_COLUMNS = [
+    "id",
+    "item_id",
+    "dept_id",
+    "cat_id",
+    "store_id",
+    "state_id"
+]
+
+
+CALENDAR_REQUIRED_COLUMNS = [
+    "date",
+    "wm_yr_wk",
+    "weekday",
+    "wday",
+    "month",
+    "year"
+]
+
+
+PRICES_REQUIRED_COLUMNS = [
+    "store_id",
+    "item_id",
+    "wm_yr_wk",
+    "sell_price"
+]
 
 
 def check_required_columns(
@@ -11,25 +38,7 @@ def check_required_columns(
     required_columns: list[str],
     dataset_name: str
 ) -> dict:
-    """
-    Check whether all required columns exist in a DataFrame.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Dataset to validate.
-
-    required_columns : list[str]
-        Expected columns.
-
-    dataset_name : str
-        Name of the dataset.
-
-    Returns
-    -------
-    dict
-        Validation result.
-    """
+    """Check whether all required columns exist."""
 
     missing_columns = [
         column
@@ -57,9 +66,7 @@ def check_dataframe_not_empty(
     df: pd.DataFrame,
     dataset_name: str
 ) -> dict:
-    """
-    Check whether a DataFrame contains at least one row.
-    """
+    """Check whether a DataFrame is empty."""
 
     if df.empty:
         return {
@@ -81,9 +88,7 @@ def check_duplicate_columns(
     df: pd.DataFrame,
     dataset_name: str
 ) -> dict:
-    """
-    Check whether the DataFrame contains duplicate column names.
-    """
+    """Check for duplicate column names."""
 
     duplicate_columns = df.columns[
         df.columns.duplicated()
@@ -105,21 +110,64 @@ def check_duplicate_columns(
     }
 
 
+def check_sales_day_columns(
+    df: pd.DataFrame
+) -> dict:
+    """
+    Check that M5 daily sales columns exist.
+
+    M5 sales columns follow the pattern:
+    d_1, d_2, d_3, ...
+    """
+
+    sales_columns = [
+        column
+        for column in df.columns
+        if column.startswith("d_")
+    ]
+
+    if not sales_columns:
+        return {
+            "dataset": "sales",
+            "check": "sales_day_columns",
+            "status": "FAIL",
+            "message": "No d_ sales columns found."
+        }
+
+    return {
+        "dataset": "sales",
+        "check": "sales_day_columns",
+        "status": "PASS",
+        "message": f"Found {len(sales_columns)} daily sales columns."
+    }
+
+
 def run_schema_checks(
     df: pd.DataFrame,
     required_columns: list[str],
     dataset_name: str
 ) -> list[dict]:
-    """
-    Run all basic schema checks for a dataset.
-    """
+    """Run common schema checks."""
 
-    return [
-        check_dataframe_not_empty(df, dataset_name),
+    results = [
+        check_dataframe_not_empty(
+            df,
+            dataset_name
+        ),
         check_required_columns(
             df,
             required_columns,
             dataset_name
         ),
-        check_duplicate_columns(df, dataset_name)
+        check_duplicate_columns(
+            df,
+            dataset_name
+        )
     ]
+
+    if dataset_name == "sales":
+        results.append(
+            check_sales_day_columns(df)
+        )
+
+    return results
