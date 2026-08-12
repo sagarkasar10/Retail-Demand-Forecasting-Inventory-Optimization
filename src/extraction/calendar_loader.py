@@ -69,6 +69,53 @@ def validate_calendar_columns(df: pd.DataFrame) -> bool:
 
     return True
 
+def prepare_calendar_for_bigquery(
+    df: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Prepare calendar data for BigQuery.
+    """
+
+    df = df.copy()
+
+    df["date"] = pd.to_datetime(
+        df["date"],
+        errors="coerce"
+    ).dt.date
+
+    numeric_columns = [
+        "wm_yr_wk",
+        "wday",
+        "month",
+        "year",
+        "snap_CA",
+        "snap_TX",
+        "snap_WI",
+    ]
+
+    for column in numeric_columns:
+        if column in df.columns:
+            df[column] = pd.to_numeric(
+                df[column],
+                errors="coerce"
+            )
+
+    string_columns = [
+        "weekday",
+        "event_name_1",
+        "event_type_1",
+        "event_name_2",
+        "event_type_2",
+    ]
+
+    for column in string_columns:
+        if column in df.columns:
+            df[column] = df[column].astype("string")
+
+    print("✓ Calendar data prepared for BigQuery")
+
+    return df
+
 
 def print_calendar_summary(df: pd.DataFrame) -> None:
     """
@@ -91,12 +138,13 @@ def print_calendar_summary(df: pd.DataFrame) -> None:
 
     print("============================================\n")
 
-
 if __name__ == "__main__":
     calendar_df = extract_calendar_data(
         "data/raw/calendar.csv"
     )
 
     validate_calendar_columns(calendar_df)
+
+    calendar_df = prepare_calendar_for_bigquery(calendar_df)
 
     print_calendar_summary(calendar_df)

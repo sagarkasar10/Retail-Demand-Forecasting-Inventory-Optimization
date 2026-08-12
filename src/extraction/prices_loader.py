@@ -66,7 +66,31 @@ def validate_prices_columns(df: pd.DataFrame) -> bool:
     print("✓ Pricing required columns are present")
 
     return True
+def prepare_prices_for_bigquery(
+    df: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Prepare pricing data for BigQuery.
+    """
 
+    df = df.copy()
+
+    df["store_id"] = df["store_id"].astype("string")
+    df["item_id"] = df["item_id"].astype("string")
+
+    df["wm_yr_wk"] = pd.to_numeric(
+        df["wm_yr_wk"],
+        errors="coerce"
+    ).astype("Int64")
+
+    df["sell_price"] = pd.to_numeric(
+        df["sell_price"],
+        errors="coerce"
+    )
+
+    print("✓ Pricing data prepared for BigQuery")
+
+    return df
 
 def print_prices_summary(df: pd.DataFrame) -> None:
     """
