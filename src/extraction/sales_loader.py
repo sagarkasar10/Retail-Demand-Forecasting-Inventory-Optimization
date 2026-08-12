@@ -1,5 +1,4 @@
 from pathlib import Path
-
 import pandas as pd
 
 REQUIRED_SALES_COLUMNS = [
@@ -41,7 +40,7 @@ def extract_sales_data(file_path: str) -> pd.DataFrame:
         ) from exc
 
     print(
-        f"✓ Sales dataset loaded successfully: "
+        f"Sales dataset loaded successfully: "
         f"{df.shape[0]:,} rows × {df.shape[1]:,} columns"
     )
 
@@ -65,7 +64,7 @@ def validate_sales_columns(df: pd.DataFrame) -> bool:
             + ", ".join(missing_columns)
         )
 
-    print("✓ Sales required columns are present")
+    print("Sales required columns are present")
 
     return True
 
@@ -110,3 +109,49 @@ def print_sales_summary(df: pd.DataFrame) -> None:
     print(f"Unique departments : {summary['unique_departments']:,}")
     print(f"Unique categories  : {summary['unique_categories']:,}")
     print("=========================================\n")
+
+
+def prepare_sales_for_bigquery(
+    df: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Prepare the raw sales DataFrame for BigQuery.
+    IDs remain strings.
+    Daily sales columns are converted to integers.
+    """
+
+    df = df.copy()
+
+    id_columns = [
+        "id",
+        "item_id",
+        "dept_id",
+        "cat_id",
+        "store_id",
+        "state_id",
+    ]
+
+    for column in id_columns:
+        df[column] = df[column].astype("string")
+
+    day_columns = [
+        column
+        for column in df.columns
+        if column.startswith("d_")
+    ]
+
+    for column in day_columns:
+        df[column] = pd.to_numeric(
+            df[column],
+            errors="coerce"
+        )
+
+        df[column] = (
+            df[column]
+            .fillna(0)
+            .astype("int64")
+        )
+
+    print("Sales data prepared for BigQuery")
+
+    return df
