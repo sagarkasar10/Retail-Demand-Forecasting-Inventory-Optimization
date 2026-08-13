@@ -23,11 +23,29 @@ from src.validation.schema_checks import (
     validate_dataset_schema,
 )
 
+from src.validation.sales_quality import (
+    check_sales_values,
+    clean_sales_data,
+)
+
+from src.validation.calendar_quality import (
+    validate_calendar_dates,
+    clean_calendar_data,
+)
+
+from src.validation.pricing_quality import (
+    validate_pricing_data,
+    clean_pricing_data,
+)
+
+from src.validation.bigquery_quality import (
+    run_all_quality_checks,
+)
+
 from src.warehouse.bigquery_client import (
     get_bigquery_client,
     create_dataset_if_not_exists,
     load_dataframe_to_bigquery,
-    get_table_row_count,
 )
 
 
@@ -35,53 +53,58 @@ from src.warehouse.bigquery_client import (
 # CONFIGURATION
 # ============================================================
 
-SALES_PATH = "data/raw/sales_train_validation.csv"
-CALENDAR_PATH = "data/raw/calendar.csv"
-PRICES_PATH = "data/raw/sell_prices.csv"
+PROJECT_ID = "GCP_PROJECT_ID"  
 
 BIGQUERY_DATASET = "retail_demand"
 
-SALES_TABLE = "raw_sales"
-CALENDAR_TABLE = "raw_calendar"
-PRICES_TABLE = "raw_prices"
+SALES_PATH = (
+    "data/raw/sales_train_validation.csv"
+)
+
+CALENDAR_PATH = (
+    "data/raw/calendar.csv"
+)
+
+PRICES_PATH = (
+    "data/raw/sell_prices.csv"
+)
 
 
 # ============================================================
-# MAIN PIPELINE
+# MAIN
 # ============================================================
 
 def main():
-    """
-    Execute the Week 1 Day 3 ETL pipeline.
-    """
 
     print("\n")
     print("=" * 70)
-    print("RETAIL DEMAND FORECASTING & INVENTORY OPTIMIZATION")
-    print("WEEK 1 - DAY 3 ETL PIPELINE")
+    print(
+        "RETAIL DEMAND FORECASTING & "
+        "INVENTORY OPTIMIZATION"
+    )
+    print("WEEK 1 - DAY 4")
     print("=" * 70)
 
     # --------------------------------------------------------
-    # STEP 1: BigQuery connection
+    # 1. BIGQUERY CONNECTION
     # --------------------------------------------------------
 
-    print("\n[1/7] INITIALIZING BIGQUERY")
+    print("\n[1/8] INITIALIZING BIGQUERY")
 
     client = get_bigquery_client(
-        project_id=None
+        project_id=PROJECT_ID
     )
 
     create_dataset_if_not_exists(
-        client=client,
-        dataset_name=BIGQUERY_DATASET,
-        location="US"
+        client,
+        BIGQUERY_DATASET
     )
 
     # --------------------------------------------------------
-    # STEP 2: Extract sales
+    # 2. EXTRACT SALES
     # --------------------------------------------------------
 
-    print("\n[2/7] EXTRACTING SALES DATA")
+    print("\n[2/8] EXTRACTING SALES")
 
     sales_df = extract_sales_data(
         SALES_PATH
@@ -96,10 +119,24 @@ def main():
     )
 
     # --------------------------------------------------------
-    # STEP 3: Extract calendar
+    # 3. SALES QUALITY + CLEANING
     # --------------------------------------------------------
 
-    print("\n[3/7] EXTRACTING CALENDAR DATA")
+    print("\n[3/8] VALIDATING SALES DATA")
+
+    check_sales_values(
+        sales_df
+    )
+
+    sales_df = clean_sales_data(
+        sales_df
+    )
+
+    # --------------------------------------------------------
+    # 4. CALENDAR
+    # --------------------------------------------------------
+
+    print("\n[4/8] VALIDATING CALENDAR DATA")
 
     calendar_df = extract_calendar_data(
         CALENDAR_PATH
@@ -109,15 +146,19 @@ def main():
         calendar_df
     )
 
-    print_calendar_summary(
+    validate_calendar_dates(
+        calendar_df
+    )
+
+    calendar_df = clean_calendar_data(
         calendar_df
     )
 
     # --------------------------------------------------------
-    # STEP 4: Extract prices
+    # 5. PRICING
     # --------------------------------------------------------
 
-    print("\n[4/7] EXTRACTING PRICING DATA")
+    print("\n[5/8] VALIDATING PRICING DATA")
 
     prices_df = extract_prices_data(
         PRICES_PATH
@@ -127,15 +168,19 @@ def main():
         prices_df
     )
 
-    print_prices_summary(
+    validate_pricing_data(
+        prices_df
+    )
+
+    prices_df = clean_pricing_data(
         prices_df
     )
 
     # --------------------------------------------------------
-    # STEP 5: Prepare data
+    # 6. PREPARE DATA
     # --------------------------------------------------------
 
-    print("\n[5/7] PREPARING DATA FOR BIGQUERY")
+    print("\n[6/8] PREPARING DATA")
 
     sales_df = prepare_sales_for_bigquery(
         sales_df
@@ -150,59 +195,16 @@ def main():
     )
 
     # --------------------------------------------------------
-    # STEP 6: Common schema validation
+    # 7. LOAD CLEANED DATA
     # --------------------------------------------------------
 
-    print("\n[6/7] RUNNING SCHEMA VALIDATION")
-
-    validate_dataset_schema(
-        sales_df,
-        [
-            "id",
-            "item_id",
-            "dept_id",
-            "cat_id",
-            "store_id",
-            "state_id",
-        ],
-        "Sales"
-    )
-
-    validate_dataset_schema(
-        calendar_df,
-        [
-            "date",
-            "wm_yr_wk",
-            "weekday",
-            "wday",
-            "month",
-            "year",
-        ],
-        "Calendar"
-    )
-
-    validate_dataset_schema(
-        prices_df,
-        [
-            "store_id",
-            "item_id",
-            "wm_yr_wk",
-            "sell_price",
-        ],
-        "Prices"
-    )
-
-    # --------------------------------------------------------
-    # STEP 7: Load data into BigQuery
-    # --------------------------------------------------------
-
-    print("\n[7/7] LOADING DATA INTO BIGQUERY")
+    print("\n[7/8] LOADING CLEANED DATA")
 
     load_dataframe_to_bigquery(
         client=client,
         dataframe=sales_df,
         dataset_name=BIGQUERY_DATASET,
-        table_name=SALES_TABLE,
+        table_name="raw_sales",
         write_disposition="WRITE_TRUNCATE"
     )
 
@@ -210,7 +212,7 @@ def main():
         client=client,
         dataframe=calendar_df,
         dataset_name=BIGQUERY_DATASET,
-        table_name=CALENDAR_TABLE,
+        table_name="raw_calendar",
         write_disposition="WRITE_TRUNCATE"
     )
 
@@ -218,47 +220,20 @@ def main():
         client=client,
         dataframe=prices_df,
         dataset_name=BIGQUERY_DATASET,
-        table_name=PRICES_TABLE,
+        table_name="raw_prices",
         write_disposition="WRITE_TRUNCATE"
     )
 
     # --------------------------------------------------------
-    # VERIFY LOADED ROW COUNTS
+    # 8. BIGQUERY QUALITY CHECKS
     # --------------------------------------------------------
 
-    print("\n")
-    print("=" * 70)
-    print("BIGQUERY LOAD VERIFICATION")
-    print("=" * 70)
+    print("\n[8/8] RUNNING BIGQUERY QUALITY CHECKS")
 
-    sales_count = get_table_row_count(
-        client,
-        BIGQUERY_DATASET,
-        SALES_TABLE
-    )
-
-    calendar_count = get_table_row_count(
-        client,
-        BIGQUERY_DATASET,
-        CALENDAR_TABLE
-    )
-
-    prices_count = get_table_row_count(
-        client,
-        BIGQUERY_DATASET,
-        PRICES_TABLE
-    )
-
-    print(
-        f"raw_sales    : {sales_count:,} rows"
-    )
-
-    print(
-        f"raw_calendar : {calendar_count:,} rows"
-    )
-
-    print(
-        f"raw_prices   : {prices_count:,} rows"
+    run_all_quality_checks(
+        client=client,
+        project_id=PROJECT_ID,
+        dataset_name=BIGQUERY_DATASET
     )
 
 
