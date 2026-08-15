@@ -266,3 +266,136 @@ SELECT
     'clean_prices' AS table_name,
     COUNT(*) AS total_rows
 FROM `GCP_PROJECT_ID.retail_demand.clean_prices`;
+
+
+-- ============================================================
+-- 16. CLEAN TABLE ROW COUNT STATUS
+-- ============================================================
+
+WITH table_counts AS (
+
+    SELECT
+        'clean_sales' AS table_name,
+        COUNT(*) AS row_count
+    FROM `GCP_PROJECT_ID.retail_demand.clean_sales`
+
+    UNION ALL
+
+    SELECT
+        'clean_calendar' AS table_name,
+        COUNT(*) AS row_count
+    FROM `GCP_PROJECT_ID.retail_demand.clean_calendar`
+
+    UNION ALL
+
+    SELECT
+        'clean_prices' AS table_name,
+        COUNT(*) AS row_count
+    FROM `GCP_PROJECT_ID.retail_demand.clean_prices`
+)
+
+SELECT
+    table_name,
+    row_count,
+    CASE
+        WHEN row_count > 0 THEN 'PASS'
+        ELSE 'FAIL'
+    END AS validation_status
+FROM table_counts
+ORDER BY table_name;
+
+
+-- ============================================================
+-- 17. CLEAN SALES KEY VALIDATION
+-- ============================================================
+
+SELECT
+    COUNT(*) AS total_rows,
+
+    COUNTIF(id IS NULL) AS null_ids,
+
+    COUNTIF(item_id IS NULL) AS null_items,
+
+    COUNTIF(store_id IS NULL) AS null_stores,
+
+    COUNTIF(dept_id IS NULL) AS null_departments,
+
+    COUNTIF(cat_id IS NULL) AS null_categories
+
+FROM `GCP_PROJECT_ID.retail_demand.clean_sales`;
+
+
+-- ============================================================
+-- 18. CLEAN CALENDAR DATE CONTINUITY
+-- ============================================================
+
+WITH ordered_dates AS (
+
+    SELECT
+        date,
+        LAG(date) OVER (
+            ORDER BY date
+        ) AS previous_date
+    FROM `GCP_PROJECT_ID.retail_demand.clean_calendar`
+)
+
+SELECT
+    COUNT(*) AS missing_date_gap_count
+FROM ordered_dates
+WHERE previous_date IS NOT NULL
+  AND DATE_DIFF(
+      date,
+      previous_date,
+      DAY
+  ) > 1;
+
+
+-- ============================================================
+-- 19. CLEAN PRICES - INVALID PRICES
+-- ============================================================
+
+SELECT
+    COUNT(*) AS invalid_price_count
+FROM `GCP_PROJECT_ID.retail_demand.clean_prices`
+WHERE sell_price IS NULL
+   OR sell_price < 0;
+
+
+-- ============================================================
+-- 20. FINAL VALIDATION STATUS
+-- ============================================================
+
+WITH validation AS (
+
+    SELECT
+        (
+            SELECT COUNT(*)
+            FROM `GCP_PROJECT_ID.retail_demand.clean_sales`
+        ) AS sales_rows,
+
+        (
+            SELECT COUNT(*)
+            FROM `GCP_PROJECT_ID.retail_demand.clean_calendar`
+        ) AS calendar_rows,
+
+        (
+            SELECT COUNT(*)
+            FROM `GCP_PROJECT_ID.retail_demand.clean_prices`
+        ) AS price_rows
+
+)
+
+SELECT
+    sales_rows,
+    calendar_rows,
+    price_rows,
+
+    CASE
+        WHEN sales_rows > 0
+         AND calendar_rows > 0
+         AND price_rows > 0
+        THEN 'PASS'
+        ELSE 'FAIL'
+    END AS overall_status
+
+FROM validation;
