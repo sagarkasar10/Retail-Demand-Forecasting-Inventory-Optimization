@@ -1,3 +1,11 @@
+from src.validation.pipeline_validation import (
+    validate_all_data
+)
+
+from src.profiling.data_summary import (
+    print_pipeline_summary
+)
+
 from src.extraction.sales_loader import (
     extract_sales_data,
     validate_sales_columns,
@@ -35,18 +43,12 @@ from src.validation.bigquery_quality import (
     run_all_quality_checks,
 )
 
-from src.profiling.sales_profile import (
-    profile_sales_data,
-    print_sales_profile,
-    get_sales_by_store,
-    get_sales_by_department,
+from src.validation.pipeline_validation import (
+    validate_all_data,
 )
 
-from src.profiling.calendar_price_profile import (
-    profile_calendar_data,
-    print_calendar_profile,
-    profile_price_data,
-    print_price_profile,
+from src.profiling.data_summary import (
+    print_pipeline_summary,
 )
 
 from src.warehouse.bigquery_client import (
@@ -58,6 +60,15 @@ from src.warehouse.bigquery_tables import (
     create_all_clean_tables,
 )
 
+from src.warehouse.warehouse_validation import (
+    verify_week1_tables
+)
+
+from src.validation.quality_report import (
+    create_quality_report,
+    print_quality_report,
+    quality_report_passed,
+)
 
 # ============================================================
 # CONFIGURATION
@@ -81,7 +92,7 @@ PRICES_PATH = (
 
 
 # ============================================================
-# MAIN
+# MAIN PIPELINE
 # ============================================================
 
 def main():
@@ -92,14 +103,14 @@ def main():
         "RETAIL DEMAND FORECASTING & "
         "INVENTORY OPTIMIZATION"
     )
-    print("WEEK 1 - DAY 5 PIPELINE")
+    print("WEEK 1 - DAY 6 PIPELINE")
     print("=" * 70)
 
     # --------------------------------------------------------
-    # STEP 1 - BIGQUERY
+    # 1. INITIALIZE BIGQUERY
     # --------------------------------------------------------
 
-    print("\n[1/9] INITIALIZING BIGQUERY")
+    print("\n[1/8] INITIALIZING BIGQUERY")
 
     client = get_bigquery_client(
         project_id=PROJECT_ID
@@ -112,10 +123,10 @@ def main():
     )
 
     # --------------------------------------------------------
-    # STEP 2 - SALES
+    # 2. LOAD AND CLEAN SALES
     # --------------------------------------------------------
 
-    print("\n[2/9] LOADING SALES DATA")
+    print("\n[2/8] PROCESSING SALES DATA")
 
     sales_df = extract_sales_data(
         SALES_PATH
@@ -133,19 +144,11 @@ def main():
         sales_df
     )
 
-    sales_profile = profile_sales_data(
-        sales_df
-    )
-
-    print_sales_profile(
-        sales_profile
-    )
-
     # --------------------------------------------------------
-    # STEP 3 - CALENDAR
+    # 3. LOAD AND CLEAN CALENDAR
     # --------------------------------------------------------
 
-    print("\n[3/9] LOADING CALENDAR DATA")
+    print("\n[3/8] PROCESSING CALENDAR DATA")
 
     calendar_df = extract_calendar_data(
         CALENDAR_PATH
@@ -163,19 +166,11 @@ def main():
         calendar_df
     )
 
-    calendar_profile = profile_calendar_data(
-        calendar_df
-    )
-
-    print_calendar_profile(
-        calendar_profile
-    )
-
     # --------------------------------------------------------
-    # STEP 4 - PRICES
+    # 4. LOAD AND CLEAN PRICES
     # --------------------------------------------------------
 
-    print("\n[4/9] LOADING PRICING DATA")
+    print("\n[4/8] PROCESSING PRICING DATA")
 
     prices_df = extract_prices_data(
         PRICES_PATH
@@ -193,19 +188,23 @@ def main():
         prices_df
     )
 
-    price_profile = profile_price_data(
-        prices_df
-    )
+    # --------------------------------------------------------
+    # 5. DATAFRAME VALIDATION
+    # --------------------------------------------------------
 
-    print_price_profile(
-        price_profile
+    print("\n[5/8] RUNNING DATAFRAME VALIDATION")
+
+    validate_all_data(
+        sales_df=sales_df,
+        calendar_df=calendar_df,
+        prices_df=prices_df
     )
 
     # --------------------------------------------------------
-    # STEP 5 - PREPARE FOR BIGQUERY
+    # 6. PREPARE DATA FOR BIGQUERY
     # --------------------------------------------------------
 
-    print("\n[5/9] PREPARING DATA")
+    print("\n[6/8] PREPARING DATA FOR BIGQUERY")
 
     sales_df = prepare_sales_for_bigquery(
         sales_df
@@ -220,42 +219,10 @@ def main():
     )
 
     # --------------------------------------------------------
-    # STEP 6 - STORE PROFILING OUTPUT
+    # 7. CREATE CLEAN BIGQUERY TABLES
     # --------------------------------------------------------
 
-    print("\n[6/9] SALES ANALYSIS")
-
-    sales_by_store = get_sales_by_store(
-        sales_df
-    )
-
-    sales_by_department = (
-        get_sales_by_department(
-            sales_df
-        )
-    )
-
-    print("\nTop stores by sales:")
-
-    print(
-        sales_by_store.head(10).to_string(
-            index=False
-        )
-    )
-
-    print("\nTop departments by sales:")
-
-    print(
-        sales_by_department.head(10).to_string(
-            index=False
-        )
-    )
-
-    # --------------------------------------------------------
-    # STEP 7 - CREATE CLEAN TABLES
-    # --------------------------------------------------------
-
-    print("\n[7/9] CREATING CLEAN BIGQUERY TABLES")
+    print("\n[7/8] CREATING CLEAN BIGQUERY TABLES")
 
     create_all_clean_tables(
         client=client,
@@ -264,22 +231,18 @@ def main():
     )
 
     # --------------------------------------------------------
-    # STEP 8 - RUN QUALITY CHECKS
+    # 8. FINAL SUMMARY
     # --------------------------------------------------------
 
-    print("\n[8/9] RUNNING FINAL QUALITY CHECKS")
+    print("\n[8/8] GENERATING FINAL SUMMARY")
 
-    run_all_quality_checks(
-        client=client,
-        project_id=PROJECT_ID,
-        dataset_name=BIGQUERY_DATASET
+    print_pipeline_summary(
+        sales_df=sales_df,
+        calendar_df=calendar_df,
+        prices_df=prices_df
     )
 
-    # --------------------------------------------------------
-    # STEP 9 - COMPLETE
-    # --------------------------------------------------------
-
-    print("\nCreated BigQuery tables:")
+    print("\nClean BigQuery tables:")
 
     print(
         f"✓ {PROJECT_ID}."
@@ -296,6 +259,77 @@ def main():
         f"{BIGQUERY_DATASET}.clean_prices"
     )
 
+    # ============================================================
+    # FINAL WEEK 1 VERIFICATION
+    # ============================================================
+
+    print("\n[FINAL] VERIFYING BIGQUERY TABLES")
+
+    warehouse_status = verify_week1_tables(
+        client=client,
+        project_id=PROJECT_ID,
+        dataset_name=BIGQUERY_DATASET
+    )
+
+
+    # ============================================================
+    # FINAL QUALITY REPORT
+    # ============================================================
+
+    print("\n[FINAL] GENERATING QUALITY REPORT")
+
+    quality_report = create_quality_report(
+        sales_df=sales_df,
+        calendar_df=calendar_df,
+        prices_df=prices_df
+    )
+
+    print_quality_report(
+        quality_report
+    )
+
+
+    # ============================================================
+    # FINAL STATUS
+    # ============================================================
+
+    data_quality_status = quality_report_passed(
+        quality_report
+    )
+
+
+    if warehouse_status and data_quality_status:
+
+        print("\n")
+        print("=" * 70)
+        print("✓ WEEK 1 COMPLETED SUCCESSFULLY")
+        print("=" * 70)
+
+        print("\nStatus:")
+        print("✓ BigQuery tables verified")
+        print("✓ Sales data validated")
+        print("✓ Calendar data validated")
+        print("✓ Pricing data validated")
+        print("✓ Clean tables verified")
+        print("✓ Data quality checks passed")
+        print("✓ ETL pipeline ready for Week 2")
+
+    else:
+
+        print("\n")
+        print("=" * 70)
+        print("✗ WEEK 1 VALIDATION FAILED")
+        print("=" * 70)
+
+        print(
+            "\nPlease review the validation errors "
+            "before starting Week 2."
+        )
+
+        raise RuntimeError(
+            "Week 1 validation failed."
+        )
 
 if __name__ == "__main__":
     main()
+    
