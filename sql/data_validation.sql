@@ -399,3 +399,151 @@ SELECT
     END AS overall_status
 
 FROM validation;
+
+-- ============================================================
+-- 21. VERIFY ALL WEEK 1 TABLES
+-- ============================================================
+
+SELECT
+    table_name
+FROM `GCP_PROJECT_ID.retail_demand.INFORMATION_SCHEMA.TABLES`
+WHERE table_name IN (
+    'raw_sales',
+    'raw_calendar',
+    'raw_prices',
+    'clean_sales',
+    'clean_calendar',
+    'clean_prices'
+)
+ORDER BY table_name;
+
+
+-- ============================================================
+-- 22. FINAL CALENDAR DATE RANGE CHECK
+-- ============================================================
+
+SELECT
+    MIN(date) AS minimum_date,
+    MAX(date) AS maximum_date,
+    COUNT(DISTINCT date) AS unique_dates,
+    COUNT(*) AS total_rows
+FROM `GCP_PROJECT_ID.retail_demand.clean_calendar`;
+
+-- ============================================================
+-- 23. FINAL PRICE SUMMARY
+-- ============================================================
+
+SELECT
+    COUNT(*) AS total_rows,
+    COUNT(DISTINCT store_id) AS unique_stores,
+    COUNT(DISTINCT item_id) AS unique_items,
+    COUNT(DISTINCT wm_yr_wk) AS unique_weeks,
+    MIN(sell_price) AS minimum_price,
+    MAX(sell_price) AS maximum_price,
+    AVG(sell_price) AS average_price
+FROM `GCP_PROJECT_ID.retail_demand.clean_prices`;
+
+
+-- ============================================================
+-- 24. FINAL WEEK 1 PASS / FAIL STATUS
+-- ============================================================
+
+WITH validation AS (
+
+    SELECT
+
+        -- ----------------------------------------------------
+        -- SALES
+        -- ----------------------------------------------------
+
+        (
+            SELECT COUNT(*)
+            FROM `GCP_PROJECT_ID.retail_demand.clean_sales`
+        ) AS sales_rows,
+
+        (
+            SELECT COUNT(*)
+            FROM `GCP_PROJECT_ID.retail_demand.clean_sales`
+            WHERE id IS NULL
+               OR item_id IS NULL
+               OR store_id IS NULL
+               OR dept_id IS NULL
+               OR cat_id IS NULL
+               OR state_id IS NULL
+        ) AS invalid_sales_rows,
+
+
+        -- ----------------------------------------------------
+        -- CALENDAR
+        -- ----------------------------------------------------
+
+        (
+            SELECT COUNT(*)
+            FROM `GCP_PROJECT_ID.retail_demand.clean_calendar`
+        ) AS calendar_rows,
+
+        (
+            SELECT COUNT(*)
+            FROM `GCP_PROJECT_ID.retail_demand.clean_calendar`
+            WHERE date IS NULL
+               OR month IS NULL
+               OR year IS NULL
+               OR month < 1
+               OR month > 12
+               OR wday < 1
+               OR wday > 7
+        ) AS invalid_calendar_rows,
+
+
+        -- ----------------------------------------------------
+        -- PRICES
+        -- ----------------------------------------------------
+
+        (
+            SELECT COUNT(*)
+            FROM `GCP_PROJECT_ID.retail_demand.clean_prices`
+        ) AS price_rows,
+
+        (
+            SELECT COUNT(*)
+            FROM `GCP_PROJECT_ID.retail_demand.clean_prices`
+            WHERE store_id IS NULL
+               OR item_id IS NULL
+               OR wm_yr_wk IS NULL
+               OR sell_price IS NULL
+               OR sell_price < 0
+        ) AS invalid_price_rows
+
+)
+
+SELECT
+
+    sales_rows,
+
+    calendar_rows,
+
+    price_rows,
+
+    invalid_sales_rows,
+
+    invalid_calendar_rows,
+
+    invalid_price_rows,
+
+    CASE
+
+        WHEN sales_rows > 0
+         AND calendar_rows > 0
+         AND price_rows > 0
+         AND invalid_sales_rows = 0
+         AND invalid_calendar_rows = 0
+         AND invalid_price_rows = 0
+
+        THEN 'WEEK 1 PASS'
+
+        ELSE 'WEEK 1 REVIEW REQUIRED'
+
+    END AS final_status
+
+FROM validation;
+
