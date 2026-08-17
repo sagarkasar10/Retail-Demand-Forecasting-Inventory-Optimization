@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: retail_demand
+
+    description: >
+      Raw M5 retail demand data loaded into BigQuery
+      by the Week 1 ETL pipeline.
+
+    database: "{{ env_var('DBT_GCP_PROJECT_ID') }}"
+    schema: retail_demand
+
+    tables:
+
+      - name: raw_sales
+        description: "Raw M5 historical sales data."
+
+      - name: raw_calendar
+        description: "Raw M5 calendar and event data."
+
+      - name: raw_prices
+        description: "Raw M5 item-store weekly pricing data."

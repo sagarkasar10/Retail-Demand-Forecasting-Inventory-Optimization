@@ -1,0 +1,72 @@
+version: 2
+
+models:
+
+  - name: stg_sales
+
+    description: "Staging model for M5 historical sales data."
+
+    columns:
+
+      - name: id
+        tests:
+          - not_null
+
+      - name: item_id
+        tests:
+          - not_null
+
+      - name: dept_id
+        tests:
+          - not_null
+
+      - name: cat_id
+        tests:
+          - not_null
+
+      - name: store_id
+        tests:
+          - not_null
+
+      - name: state_id
+        tests:
+          - not_null
+
+
+  - name: stg_calendar
+
+    description: "Staging model for M5 calendar data."
+
+    columns:
+
+      - name: date
+        tests:
+          - not_null
+          - unique
+
+      - name: wm_yr_wk
+        tests:
+          - not_null
+
+
+  - name: stg_prices
+
+    description: "Staging model for M5 pricing data."
+
+    columns:
+
+      - name: store_id
+        tests:
+          - not_null
+
+      - name: item_id
+        tests:
+          - not_null
+
+      - name: wm_yr_wk
+        tests:
+          - not_null
+
+      - name: sell_price
+        tests:
+          - not_null
