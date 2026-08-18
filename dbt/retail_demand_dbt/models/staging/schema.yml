@@ -1,0 +1,62 @@
+version: 2
+
+models:
+
+  - name: stg_sales
+    description: "Standardized M5 sales staging model."
+
+    columns:
+      - name: id
+        description: "Item-store combination identifier."
+
+      - name: item_id
+        description: "Product identifier."
+
+      - name: dept_id
+        description: "Department identifier."
+
+      - name: cat_id
+        description: "Category identifier."
+
+      - name: store_id
+        description: "Store identifier."
+
+      - name: state_id
+        description: "State identifier."
+
+
+  - name: stg_calendar
+    description: "Standardized M5 calendar staging model."
+
+    columns:
+      - name: date
+        description: "Calendar date."
+
+      - name: wm_yr_wk
+        description: "M5 week identifier."
+
+      - name: weekday
+        description: "Day of week."
+
+      - name: month
+        description: "Month number."
+
+      - name: year
+        description: "Year."
+
+
+  - name: stg_prices
+    description: "Standardized M5 weekly pricing staging model."
+
+    columns:
+      - name: store_id
+        description: "Store identifier."
+
+      - name: item_id
+        description: "Product identifier."
+
+      - name: wm_yr_wk
+        description: "M5 week identifier."
+
+      - name: sell_price
+        description: "Weekly selling price."
