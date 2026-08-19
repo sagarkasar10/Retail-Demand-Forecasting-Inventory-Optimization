@@ -21,4 +21,4 @@ clean_prices AS (
 )
 
 SELECT *
-FROM source_prices
+FROM clean_prices
