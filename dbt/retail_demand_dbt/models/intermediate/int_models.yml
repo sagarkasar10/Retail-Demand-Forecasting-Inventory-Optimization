@@ -1,0 +1,125 @@
+version: 2
+
+
+models:
+
+
+  - name: int_sales_with_calendar
+    description: >
+      Daily sales enriched with calendar attributes,
+      events, seasonality and SNAP information.
+
+
+    columns:
+      - name: id
+        description: "Item-store combination identifier."
+        tests:
+          - not_null
+
+
+      - name: item_id
+        description: "Product identifier."
+        tests:
+          - not_null
+
+
+      - name: store_id
+        description: "Store identifier."
+        tests:
+          - not_null
+
+
+      - name: date
+        description: "Sales date."
+        tests:
+          - not_null
+
+
+      - name: sales
+        description: "Units sold on the date."
+        tests:
+          - not_null
+
+
+      - name: wm_yr_wk
+        description: "M5 week identifier."
+        tests:
+          - not_null
+
+
+
+
+  - name: int_sales_with_prices
+    description: >
+      Daily sales enriched with weekly item-store
+      selling price information.
+
+
+    columns:
+      - name: id
+        description: "Item-store combination identifier."
+        tests:
+          - not_null
+
+
+      - name: item_id
+        description: "Product identifier."
+        tests:
+          - not_null
+
+
+      - name: store_id
+        description: "Store identifier."
+        tests:
+          - not_null
+
+
+      - name: date
+        description: "Sales date."
+        tests:
+          - not_null
+
+
+      - name: sales
+        description: "Units sold on the date."
+        tests:
+          - not_null
+
+
+      - name: sell_price
+        description: "Weekly selling price."
+
+
+
+
+  - name: int_sales_events
+    description: >
+      Daily sales dataset containing consolidated event
+      information and event-day indicators.
+
+
+    columns:
+      - name: id
+        description: "Item-store combination identifier."
+        tests:
+          - not_null
+
+
+      - name: date
+        description: "Sales date."
+        tests:
+          - not_null
+
+
+      - name: event_name
+        description: "Consolidated event name."
+
+
+      - name: event_type
+        description: "Consolidated event type."
+
+
+      - name: is_event_day
+        description: "Indicates whether the date contains an event."
+        tests:
+          - not_null
