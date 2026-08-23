@@ -1,0 +1,46 @@
+version: 2
+
+models:
+
+  - name: int_daily_sales
+    description: >
+      Converts M5 wide-format daily sales columns into
+      long-format item-store-date records.
+
+    meta:
+      grain: "One row per item-store-date"
+      upstream_models:
+        - stg_sales
+        - stg_calendar
+
+  - name: int_sales_with_calendar
+    description: >
+      Enriches daily sales with calendar, event,
+      seasonality and SNAP information.
+
+    meta:
+      grain: "One row per item-store-date"
+      upstream_models:
+        - int_daily_sales
+        - stg_calendar
+
+  - name: int_sales_with_prices
+    description: >
+      Enriches sales and calendar data with item-store
+      weekly selling prices.
+
+    meta:
+      grain: "One row per item-store-date"
+      upstream_models:
+        - int_sales_with_calendar
+        - stg_prices
+
+  - name: int_sales_events
+    description: >
+      Consolidates event information and creates an
+      event-day indicator.
+
+    meta:
+      grain: "One row per item-store-date"
+      upstream_models:
+        - int_sales_with_prices
