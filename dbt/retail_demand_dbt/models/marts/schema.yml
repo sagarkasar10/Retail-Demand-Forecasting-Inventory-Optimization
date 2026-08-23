@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: fct_daily_sales
+    description: >
+      Final daily sales fact table used as the primary
+      analytical source for demand forecasting.
+
+    meta:
+      owner: "Data Engineering"
+      grain: "One row per item-store-date"
+      upstream_models:
+        - int_sales_events
+
+  - name: fct_weekly_sales
+    description: >
+      Weekly item-store sales aggregation used for
+      weekly demand analysis and forecasting.
+
+    meta:
+      owner: "Data Engineering"
+      grain: "One row per item-store-week"
+      upstream_models:
+        - fct_daily_sales
+
+  - name: fct_monthly_sales
+    description: >
+      Monthly item-store sales aggregation used for
+      long-term demand analysis.
+
+    meta:
+      owner: "Data Engineering"
+      grain: "One row per item-store-month"
+      upstream_models:
+        - fct_daily_sales
