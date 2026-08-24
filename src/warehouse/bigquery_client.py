@@ -2,7 +2,6 @@ import os
 
 from google.cloud import bigquery
 from dotenv import load_dotenv
-from google.cloud import bigquery
 
 
 # Load variables from .env
