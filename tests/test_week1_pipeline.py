@@ -1,10 +1,90 @@
 import pandas as pd
+import pytest
+
+from src.validation.sales_quality import (
+    clean_sales_data,
+)
+
+from src.validation.pricing_quality import (
+    clean_pricing_data,
+)
+
+from src.validation.calendar_quality import (
+    clean_calendar_data,
+)
 
 from src.validation.pipeline_validation import (
     validate_sales_dataframe,
     validate_calendar_dataframe,
     validate_price_dataframe,
 )
+
+def test_sales_negative_values_are_rejected():
+
+    df = create_sales_test_data()
+
+    df["d_1"] = [-10]
+
+    with pytest.raises(ValueError):
+        clean_sales_data(df)
+
+
+def test_sales_null_values_are_rejected():
+
+    df = create_sales_test_data()
+
+    df["d_1"] = [None]
+
+    with pytest.raises(ValueError):
+        clean_sales_data(df)
+
+
+def test_duplicate_sales_ids_are_detected():
+
+    df = pd.concat(
+        [
+            create_sales_test_data(),
+            create_sales_test_data(),
+        ],
+        ignore_index=True,
+    )
+
+    from src.validation.pipeline_validation import (
+        validate_sales_dataframe,
+    )
+
+    with pytest.raises(ValueError):
+        validate_sales_dataframe(df)
+
+
+def test_negative_price_is_rejected():
+
+    df = create_price_test_data()
+
+    df["sell_price"] = [-5]
+
+    with pytest.raises(ValueError):
+        clean_pricing_data(df)
+
+
+def test_invalid_calendar_month_is_rejected():
+
+    df = create_calendar_test_data()
+
+    df["month"] = [13]
+
+    with pytest.raises(ValueError):
+        clean_calendar_data(df)
+
+
+def test_invalid_calendar_weekday_is_rejected():
+
+    df = create_calendar_test_data()
+
+    df["wday"] = [8]
+
+    with pytest.raises(ValueError):
+        clean_calendar_data(df)
 
 
 def create_sales_test_data():
