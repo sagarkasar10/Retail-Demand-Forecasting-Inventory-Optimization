@@ -63,6 +63,22 @@ from src.validation.quality_report import (
     quality_report_passed,
 )
 
+import logging
+
+from src.forecasting.data_loader import (
+    load_daily_sales,
+    validate_daily_sales,
+)
+from src.forecasting.train_test_split import (
+    chronological_split,
+)
+from src.forecasting.prophet_features import (
+    prepare_prophet_data,
+)
+from src.forecasting.lightgbm_features import (
+    prepare_lightgbm_features,
+)
+
 # ============================================================
 # CONFIGURATION
 # ============================================================
@@ -368,6 +384,90 @@ def main():
             "Week 1 validation failed."
         )
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
+
+def run_forecasting_pipeline():
+    """
+    Week 3 Day 1 forecasting pipeline foundation.
+
+    Model training and forecast writing will be added
+    in later Week 3 days.
+    """
+
+    logger.info("Starting Week 3 forecasting pipeline.")
+
+    logger.info("Loading daily sales mart.")
+
+    daily_sales = load_daily_sales()
+
+    validate_daily_sales(daily_sales)
+
+    logger.info(
+        "Loaded %s rows of daily sales data.",
+        len(daily_sales),
+    )
+
+    logger.info("Creating chronological train/validation/test split.")
+
+    train_df, validation_df, test_df = chronological_split(
+        daily_sales,
+        validation_days=30,
+        test_days=30,
+    )
+
+    logger.info(
+        "Train rows: %s | Validation rows: %s | Test rows: %s",
+        len(train_df),
+        len(validation_df),
+        len(test_df),
+    )
+
+    logger.info("Preparing initial Prophet dataset.")
+
+    prophet_df = prepare_prophet_data(
+        train_df,
+        group_columns=[],
+    )
+
+    logger.info(
+        "Prophet rows prepared: %s",
+        len(prophet_df),
+    )
+
+    logger.info("Preparing initial LightGBM features.")
+
+    lightgbm_df = prepare_lightgbm_features(
+        train_df,
+    )
+
+    logger.info(
+        "LightGBM feature rows prepared: %s",
+        len(lightgbm_df),
+    )
+
+    logger.info(
+        "Week 3 Day 1 forecasting foundation completed."
+    )
+
+    return {
+        "daily_sales": daily_sales,
+        "train": train_df,
+        "validation": validation_df,
+        "test": test_df,
+        "prophet": prophet_df,
+        "lightgbm": lightgbm_df,
+    }
+
+
 if __name__ == "__main__":
     main()
+    run_forecasting_pipeline()
+    
+    
     
