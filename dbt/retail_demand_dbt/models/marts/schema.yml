@@ -1,0 +1,83 @@
+version: 2
+
+models:
+
+  - name: fct_daily_sales
+
+    description: >
+      Daily item-store sales fact table enriched with
+      calendar, event and pricing information.
+
+    columns:
+
+      - name: id
+        tests:
+          - not_null
+
+      - name: item_id
+        tests:
+          - not_null
+
+      - name: store_id
+        tests:
+          - not_null
+
+      - name: date
+        tests:
+          - not_null
+
+      - name: sales
+        tests:
+          - not_null
+
+
+  - name: fct_weekly_sales
+
+    description: >
+      Weekly aggregated item-store sales fact table.
+
+    columns:
+
+      - name: item_id
+        tests:
+          - not_null
+
+      - name: store_id
+        tests:
+          - not_null
+
+      - name: wm_yr_wk
+        tests:
+          - not_null
+
+      - name: total_sales
+        tests:
+          - not_null
+
+
+  - name: fct_monthly_sales
+
+    description: >
+      Monthly aggregated item-store sales fact table.
+
+    columns:
+
+      - name: item_id
+        tests:
+          - not_null
+
+      - name: store_id
+        tests:
+          - not_null
+
+      - name: year
+        tests:
+          - not_null
+
+      - name: month
+        tests:
+          - not_null
+
+      - name: total_sales
+        tests:
+          - not_null

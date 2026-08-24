@@ -1,0 +1,58 @@
+version: 2
+
+models:
+
+  - name: int_sales_calendar_mapping
+    description: >
+      Maps each M5 daily sales column to its corresponding
+      calendar date and M5 week.
+
+    columns:
+
+      - name: day_number
+        description: "Sequential M5 day number."
+        tests:
+          - not_null
+          - unique
+
+      - name: date
+        description: "Calendar date."
+        tests:
+          - not_null
+
+      - name: wm_yr_wk
+        description: "M5 week identifier."
+        tests:
+          - not_null
+
+
+  - name: int_daily_sales
+    description: >
+      Daily item-store sales in long format.
+
+    columns:
+
+      - name: id
+        description: "Item-store combination."
+
+      - name: item_id
+        description: "Product identifier."
+
+      - name: dept_id
+        description: "Department identifier."
+
+      - name: cat_id
+        description: "Category identifier."
+
+      - name: store_id
+        description: "Store identifier."
+
+      - name: state_id
+        description: "State identifier."
+
+      - name: date
+        description: "Sales date."
+
+      - name: sales
+        description: "Units sold on the date."
+
