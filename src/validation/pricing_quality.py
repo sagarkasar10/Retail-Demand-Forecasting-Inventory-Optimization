@@ -64,6 +64,8 @@ def clean_pricing_data(
 ) -> pd.DataFrame:
     """
     Standardize pricing data.
+    Invalid prices are rejected instead of silently
+    converted to NULL.
     """
 
     df = df.copy()
@@ -83,22 +85,32 @@ def clean_pricing_data(
     df["wm_yr_wk"] = pd.to_numeric(
         df["wm_yr_wk"],
         errors="coerce"
-    ).astype("Int64")
+    )
+
+    if df["wm_yr_wk"].isna().any():
+        raise ValueError(
+            "Pricing data contains invalid wm_yr_wk values."
+        )
+
+    df["wm_yr_wk"] = df["wm_yr_wk"].astype("Int64")
 
     df["sell_price"] = pd.to_numeric(
         df["sell_price"],
         errors="coerce"
     )
 
-    # Prices cannot logically be negative.
-    df.loc[
-        df["sell_price"] < 0,
-        "sell_price"
-    ] = pd.NA
+    if df["sell_price"].isna().any():
+        raise ValueError(
+            "Pricing data contains NULL or invalid prices."
+        )
+
+    if (df["sell_price"] < 0).any():
+        raise ValueError(
+            "Pricing data contains negative prices."
+        )
 
     print(
         "✓ Pricing data standardized"
     )
 
     return df
-

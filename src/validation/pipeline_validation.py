@@ -43,10 +43,31 @@ def validate_sales_dataframe(
             "Sales data contains NULL store IDs."
         )
 
+    if df["id"].duplicated().any():
+        raise ValueError(
+            "Sales data contains duplicate IDs."
+    )
+
     print("✓ Sales validation passed")
 
-    return True
+    day_columns = [
+        column
+        for column in df.columns
+        if column.startswith("d_")
+    ]
 
+    if not day_columns:
+        raise ValueError(
+            "Sales data contains no daily sales columns."
+        )
+
+    for column in day_columns:
+        if (df[column] < 0).any():
+            raise ValueError(
+                f"Sales data contains negative values in {column}."
+            )
+
+    return True
 
 def validate_calendar_dataframe(
     df: pd.DataFrame

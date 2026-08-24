@@ -53,40 +53,55 @@ def validate_calendar_dates(
     return results
 
 
-def clean_calendar_data(
+def clean_sales_data(
     df: pd.DataFrame
 ) -> pd.DataFrame:
     """
-    Standardize calendar data.
+    Clean sales data while preserving the M5 wide structure.
+    Invalid negative sales are rejected rather than silently
+    converted to zero.
     """
 
     df = df.copy()
 
-    df["date"] = pd.to_datetime(
-        df["date"],
-        errors="coerce"
-    )
-
-    numeric_columns = [
-        "wm_yr_wk",
-        "wday",
-        "month",
-        "year",
+    day_columns = [
+        column
+        for column in df.columns
+        if column.startswith("d_")
     ]
 
-    for column in numeric_columns:
-        if column in df.columns:
-            df[column] = pd.to_numeric(
-                df[column],
-                errors="coerce"
+    if not day_columns:
+        raise ValueError(
+            "No daily sales columns found."
+        )
+
+    for column in day_columns:
+
+        df[column] = pd.to_numeric(
+            df[column],
+            errors="coerce"
+        )
+
+        if df[column].isna().any():
+            raise ValueError(
+                f"Sales column {column} contains invalid "
+                "or NULL values."
             )
 
+        if (df[column] < 0).any():
+            raise ValueError(
+                f"Sales column {column} contains negative values."
+            )
+
+        df[column] = df[column].astype("int64")
+
     text_columns = [
-        "weekday",
-        "event_name_1",
-        "event_type_1",
-        "event_name_2",
-        "event_type_2",
+        "id",
+        "item_id",
+        "dept_id",
+        "cat_id",
+        "store_id",
+        "state_id",
     ]
 
     for column in text_columns:
@@ -97,27 +112,8 @@ def clean_calendar_data(
                 .str.strip()
             )
 
-    # Convert SNAP columns to integers
-    snap_columns = [
-        "snap_CA",
-        "snap_TX",
-        "snap_WI",
-    ]
-
-    for column in snap_columns:
-        if column in df.columns:
-            df[column] = (
-                pd.to_numeric(
-                    df[column],
-                    errors="coerce"
-                )
-                .fillna(0)
-                .astype("int64")
-            )
-
     print(
-        "✓ Calendar data standardized"
+        "✓ Sales data cleaned successfully"
     )
 
     return df
-

@@ -88,7 +88,9 @@ def clean_sales_data(
     df: pd.DataFrame
 ) -> pd.DataFrame:
     """
-    Clean sales data without changing its structure.
+    Clean sales data while preserving the M5 wide structure.
+    Invalid negative sales are rejected rather than silently
+    converted to zero.
     """
 
     df = df.copy()
@@ -99,6 +101,11 @@ def clean_sales_data(
         if column.startswith("d_")
     ]
 
+    if not day_columns:
+        raise ValueError(
+            "No daily sales columns found."
+        )
+
     for column in day_columns:
 
         df[column] = pd.to_numeric(
@@ -106,15 +113,18 @@ def clean_sales_data(
             errors="coerce"
         )
 
-        df[column] = (
-            df[column]
-            .fillna(0)
-            .clip(lower=0)
-        )
+        if df[column].isna().any():
+            raise ValueError(
+                f"Sales column {column} contains invalid "
+                "or NULL values."
+            )
 
-        df[column] = df[column].astype(
-            "int64"
-        )
+        if (df[column] < 0).any():
+            raise ValueError(
+                f"Sales column {column} contains negative values."
+            )
+
+        df[column] = df[column].astype("int64")
 
     text_columns = [
         "id",
