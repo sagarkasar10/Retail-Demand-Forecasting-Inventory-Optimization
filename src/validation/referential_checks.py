@@ -1,19 +1,14 @@
-"""
-Referential integrity checks for the M5 datasets.
-"""
-
-
 def create_referential_result(
-    check: str,
-    status: str,
-    message: str
+    check_name: str,
+    passed: bool,
+    invalid_count: int,
 ) -> dict:
     """
     Create a standardized referential integrity result.
     """
 
     return {
-        "check": check,
-        "status": status,
-        "message": message
+        "check_name": check_name,
+        "passed": passed,
+        "invalid_count": invalid_count,
     }

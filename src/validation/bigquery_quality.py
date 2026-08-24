@@ -230,11 +230,13 @@ def check_calendar_dates(
 def run_all_quality_checks(
     client,
     project_id: str,
-    dataset_name: str
-):
+    dataset_name: str,
+    include_clean: bool = False,
+) -> bool:
     """
-    Run all Day 4 BigQuery data quality checks.
+    Run Week 1 BigQuery quality checks.
     """
+
     print("\n" + "=" * 60)
     print("BIGQUERY DATA QUALITY CHECKS")
     print("=" * 60)
@@ -245,20 +247,37 @@ def run_all_quality_checks(
         "raw_prices",
     ]
 
+    if include_clean:
+        tables.extend([
+            "clean_sales",
+            "clean_calendar",
+            "clean_prices",
+        ])
+
+    all_passed = True
+
     for table in tables:
-        check_table_exists(
+
+        exists = check_table_exists(
             client,
             project_id,
             dataset_name,
-            table
+            table,
         )
 
-        check_row_count(
+        if not exists:
+            all_passed = False
+            continue
+
+        row_count = check_row_count(
             client,
             project_id,
             dataset_name,
-            table
+            table,
         )
+
+        if row_count == 0:
+            all_passed = False
 
     check_null_counts(
         client,
@@ -272,7 +291,7 @@ def run_all_quality_checks(
             "cat_id",
             "store_id",
             "state_id",
-        ]
+        ],
     )
 
     check_null_counts(
@@ -283,7 +302,7 @@ def run_all_quality_checks(
         [
             "date",
             "wm_yr_wk",
-        ]
+        ],
     )
 
     check_null_counts(
@@ -296,27 +315,40 @@ def run_all_quality_checks(
             "item_id",
             "wm_yr_wk",
             "sell_price",
-        ]
+        ],
     )
 
-    check_negative_prices(
+    negative_prices = check_negative_prices(
         client,
         project_id,
-        dataset_name
+        dataset_name,
     )
 
-    check_duplicate_prices(
+    duplicate_prices = check_duplicate_prices(
         client,
         project_id,
-        dataset_name
+        dataset_name,
     )
 
     check_calendar_dates(
         client,
         project_id,
-        dataset_name
+        dataset_name,
     )
 
+    if negative_prices > 0:
+        all_passed = False
+
+    if duplicate_prices > 0:
+        all_passed = False
+
     print("=" * 60)
-    print("DATA QUALITY CHECKS COMPLETED")
+
+    if all_passed:
+        print("✓ BIGQUERY QUALITY CHECKS PASSED")
+    else:
+        print("✗ BIGQUERY QUALITY CHECKS FAILED")
+
     print("=" * 60)
+
+    return all_passed
