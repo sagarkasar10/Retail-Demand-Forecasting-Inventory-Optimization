@@ -75,8 +75,17 @@ from src.forecasting.train_test_split import (
 from src.forecasting.prophet_features import (
     prepare_prophet_data,
 )
+from src.forecasting.prophet_model import (
+    train_and_forecast_prophet,
+)
 from src.forecasting.lightgbm_features import (
     prepare_lightgbm_features,
+)
+from src.forecasting.lightgbm_model import (
+    train_lightgbm_model,
+)
+from src.forecasting.evaluation import (
+    evaluate_forecast,
 )
 
 # ============================================================
@@ -393,27 +402,22 @@ logger = logging.getLogger(__name__)
 
 
 def run_forecasting_pipeline():
-    """
-    Week 3 Day 1 forecasting pipeline foundation.
+    """Run the Week 3 Day 2 forecasting pipeline."""
 
-    Model training and forecast writing will be added
-    in later Week 3 days.
-    """
-
-    logger.info("Starting Week 3 forecasting pipeline.")
-
-    logger.info("Loading daily sales mart.")
+    logger.info(
+        "Starting Week 3 Day 2 forecasting pipeline."
+    )
 
     daily_sales = load_daily_sales()
 
-    validate_daily_sales(daily_sales)
-
-    logger.info(
-        "Loaded %s rows of daily sales data.",
-        len(daily_sales),
+    validate_daily_sales(
+        daily_sales
     )
 
-    logger.info("Creating chronological train/validation/test split.")
+    logger.info(
+        "Loaded %s rows.",
+        len(daily_sales),
+    )
 
     train_df, validation_df, test_df = chronological_split(
         daily_sales,
@@ -422,48 +426,97 @@ def run_forecasting_pipeline():
     )
 
     logger.info(
-        "Train rows: %s | Validation rows: %s | Test rows: %s",
+        "Train: %s | Validation: %s | Test: %s",
         len(train_df),
         len(validation_df),
         len(test_df),
     )
 
-    logger.info("Preparing initial Prophet dataset.")
+    logger.info(
+        "Preparing Prophet training data."
+    )
 
-    prophet_df = prepare_prophet_data(
-        train_df,
-        group_columns=[],
+    prophet_train = prepare_prophet_data(
+        train_df
+    )
+
+    prophet_forecast = train_and_forecast_prophet(
+        prophet_train,
+        periods=30,
     )
 
     logger.info(
-        "Prophet rows prepared: %s",
-        len(prophet_df),
-    )
-
-    logger.info("Preparing initial LightGBM features.")
-
-    lightgbm_df = prepare_lightgbm_features(
-        train_df,
+        "Prophet forecast generated: %s rows.",
+        len(prophet_forecast),
     )
 
     logger.info(
-        "LightGBM feature rows prepared: %s",
-        len(lightgbm_df),
+        "Preparing LightGBM training features."
+    )
+
+    lightgbm_train = prepare_lightgbm_features(
+        train_df
+    )
+
+    lightgbm_model = train_lightgbm_model(
+        lightgbm_train
     )
 
     logger.info(
-        "Week 3 Day 1 forecasting foundation completed."
+        "LightGBM model trained successfully."
+    )
+
+    logger.info(
+        "Running initial validation check."
+    )
+
+    validation_features = prepare_lightgbm_features(
+        validation_df
+    )
+
+    validation_features = validation_features.dropna()
+
+    if not validation_features.empty:
+        predictions = lightgbm_model.predict(
+            validation_features[
+                [
+                    "day_of_week",
+                    "day_of_month",
+                    "week_of_year",
+                    "month_number",
+                    "year_number",
+                    "lag_1",
+                    "lag_7",
+                    "lag_14",
+                    "lag_28",
+                    "rolling_mean_7",
+                    "rolling_mean_14",
+                    "rolling_mean_28",
+                ]
+            ]
+        )
+
+        metrics = evaluate_forecast(
+            validation_features["sales"],
+            predictions,
+        )
+
+        logger.info(
+            "LightGBM validation metrics: %s",
+            metrics,
+        )
+
+    logger.info(
+        "Week 3 Day 2 pipeline completed."
     )
 
     return {
-        "daily_sales": daily_sales,
+        "prophet_forecast": prophet_forecast,
+        "lightgbm_model": lightgbm_model,
         "train": train_df,
         "validation": validation_df,
         "test": test_df,
-        "prophet": prophet_df,
-        "lightgbm": lightgbm_df,
     }
-
 
 if __name__ == "__main__":
     main()
