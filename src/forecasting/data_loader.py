@@ -90,6 +90,91 @@ def load_daily_sales(
 
     return dataframe
 
+def load_forecasting_series(
+    item_id: str,
+    store_id: str,
+    table_name: str = DEFAULT_TABLE,
+    project_id: Optional[str] = None,
+    dataset_id: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Load one item-store time series for forecasting.
+    """
+
+    project_id = project_id or os.getenv("GCP_PROJECT_ID")
+    dataset_id = dataset_id or os.getenv(
+        "BIGQUERY_MART_DATASET",
+        "retail_demand_marts",
+    )
+
+    if not project_id:
+        raise ValueError(
+            "GCP_PROJECT_ID environment variable is required."
+        )
+
+    table_ref = f"{project_id}.{dataset_id}.{table_name}"
+
+    query = f"""
+        SELECT
+            date,
+            item_id,
+            dept_id,
+            cat_id,
+            store_id,
+            state_id,
+            sales,
+            sell_price,
+            weekday,
+            month,
+            year,
+            event,
+            event_type
+        FROM {table_ref}
+        WHERE CAST(item_id AS STRING) = @item_id
+          AND CAST(store_id AS STRING) = @store_id
+        ORDER BY date
+    """
+
+    client = get_bigquery_client()
+
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter(
+                "item_id",
+                "STRING",
+                str(item_id),
+            ),
+            bigquery.ScalarQueryParameter(
+                "store_id",
+                "STRING",
+                str(store_id),
+            ),
+        ]
+    )
+
+    dataframe = client.query(
+        query,
+        job_config=job_config,
+    ).to_dataframe()
+
+    if dataframe.empty:
+        raise ValueError(
+            f"No data found for item_id={item_id}, "
+            f"store_id={store_id}."
+        )
+
+    dataframe["date"] = pd.to_datetime(
+        dataframe["date"],
+        errors="coerce",
+    )
+
+    dataframe["sales"] = pd.to_numeric(
+        dataframe["sales"],
+        errors="coerce",
+    )
+
+    return dataframe
+
 
 def validate_daily_sales(dataframe: pd.DataFrame) -> None:
     """
