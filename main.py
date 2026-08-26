@@ -71,22 +71,32 @@ from src.forecasting.data_loader import (
 )
 from src.forecasting.train_test_split import (
     chronological_split,
+    get_split_summary,
 )
 from src.forecasting.prophet_features import (
     prepare_prophet_data,
 )
 from src.forecasting.prophet_model import (
     train_and_forecast_prophet,
+    create_prophet_forecast_output,
 )
 from src.forecasting.lightgbm_features import (
     prepare_lightgbm_features,
 )
 from src.forecasting.lightgbm_model import (
     train_lightgbm_model,
+    predict_lightgbm,
+    DEFAULT_FEATURES,
 )
 from src.forecasting.evaluation import (
     evaluate_forecast,
 )
+from src.forecasting.model_comparison import (
+    evaluate_model_predictions,
+    compare_model_metrics,
+    select_best_model,
+)
+
 
 # ============================================================
 # CONFIGURATION
@@ -402,21 +412,16 @@ logger = logging.getLogger(__name__)
 
 
 def run_forecasting_pipeline():
-    """Run the Week 3 Day 2 forecasting pipeline."""
+    """Run the Week 3 Day 3 forecasting pipeline."""
 
     logger.info(
-        "Starting Week 3 Day 2 forecasting pipeline."
+        "Starting Week 3 Day 3 forecasting pipeline."
     )
 
     daily_sales = load_daily_sales()
 
     validate_daily_sales(
         daily_sales
-    )
-
-    logger.info(
-        "Loaded %s rows.",
-        len(daily_sales),
     )
 
     train_df, validation_df, test_df = chronological_split(
@@ -426,14 +431,16 @@ def run_forecasting_pipeline():
     )
 
     logger.info(
-        "Train: %s | Validation: %s | Test: %s",
-        len(train_df),
-        len(validation_df),
-        len(test_df),
+        "Split summary: %s",
+        get_split_summary(
+            train_df,
+            validation_df,
+            test_df,
+        ),
     )
 
     logger.info(
-        "Preparing Prophet training data."
+        "Training Prophet."
     )
 
     prophet_train = prepare_prophet_data(
@@ -445,9 +452,13 @@ def run_forecasting_pipeline():
         periods=30,
     )
 
+    prophet_output = create_prophet_forecast_output(
+        prophet_forecast
+    )
+
     logger.info(
-        "Prophet forecast generated: %s rows.",
-        len(prophet_forecast),
+        "Prophet generated %s forecast rows.",
+        len(prophet_output),
     )
 
     logger.info(
@@ -458,61 +469,154 @@ def run_forecasting_pipeline():
         train_df
     )
 
+    lightgbm_train = lightgbm_train.dropna(
+        subset=DEFAULT_FEATURES + ["sales"]
+    )
+
     lightgbm_model = train_lightgbm_model(
         lightgbm_train
     )
 
     logger.info(
-        "LightGBM model trained successfully."
+        "LightGBM model trained."
     )
 
     logger.info(
-        "Running initial validation check."
+        "Preparing LightGBM validation features."
     )
+
+    combined_history = daily_sales[
+        daily_sales["date"] <= validation_df["date"].max()
+    ].copy()
 
     validation_features = prepare_lightgbm_features(
-        validation_df
+        combined_history
     )
 
-    validation_features = validation_features.dropna()
+    validation_features = validation_features[
+        validation_features["date"].isin(
+            validation_df["date"]
+        )
+    ].copy()
+
+    validation_features = validation_features.dropna(
+        subset=DEFAULT_FEATURES + ["sales"]
+    )
+
+    model_metrics = []
 
     if not validation_features.empty:
-        predictions = lightgbm_model.predict(
-            validation_features[
-                [
-                    "day_of_week",
-                    "day_of_month",
-                    "week_of_year",
-                    "month_number",
-                    "year_number",
-                    "lag_1",
-                    "lag_7",
-                    "lag_14",
-                    "lag_28",
-                    "rolling_mean_7",
-                    "rolling_mean_14",
-                    "rolling_mean_28",
-                ]
-            ]
+        lightgbm_predictions = predict_lightgbm(
+            lightgbm_model,
+            validation_features,
+            DEFAULT_FEATURES,
         )
 
-        metrics = evaluate_forecast(
+        lightgbm_metrics = evaluate_model_predictions(
             validation_features["sales"],
-            predictions,
+            lightgbm_predictions,
+            "LightGBM",
+        )
+
+        model_metrics.append(
+            lightgbm_metrics
         )
 
         logger.info(
-            "LightGBM validation metrics: %s",
-            metrics,
+            "LightGBM metrics: %s",
+            lightgbm_metrics,
         )
 
     logger.info(
-        "Week 3 Day 2 pipeline completed."
+        "Evaluating Prophet on the validation period."
+    )
+
+    prophet_validation_train = prepare_prophet_data(
+        train_df
+    )
+
+    prophet_validation_model_forecast = train_and_forecast_prophet(
+        prophet_validation_train,
+        periods=30,
+    )
+
+    prophet_actual = validation_df[
+        ["date", "sales"]
+    ].copy()
+
+    prophet_actual["date"] = pd.to_datetime(
+        prophet_actual["date"]
+    )
+
+    prophet_predictions = (
+        prophet_validation_model_forecast
+        .rename(
+            columns={
+                "ds": "date",
+                "yhat": "predicted_demand",
+            }
+        )
+        [["date", "predicted_demand"]]
+    )
+
+    prophet_validation = prophet_actual.merge(
+        prophet_predictions,
+        on="date",
+        how="inner",
+    )
+
+    if not prophet_validation.empty:
+        prophet_metrics = evaluate_model_predictions(
+            prophet_validation["sales"],
+            prophet_validation["predicted_demand"],
+            "Prophet",
+        )
+
+        model_metrics.append(
+            prophet_metrics
+        )
+
+        logger.info(
+            "Prophet metrics: %s",
+            prophet_metrics,
+        )
+
+    if model_metrics:
+        comparison = compare_model_metrics(
+            model_metrics
+        )
+
+        best_model = select_best_model(
+            comparison,
+            metric="wape",
+        )
+
+        logger.info(
+            "Model comparison:\n%s",
+            comparison.to_string(index=False),
+        )
+
+        logger.info(
+            "Best model based on WAPE: %s",
+            best_model,
+        )
+    else:
+        comparison = None
+        best_model = None
+
+        logger.warning(
+            "No model metrics were generated."
+        )
+
+    logger.info(
+        "Week 3 Day 3 forecasting pipeline completed."
     )
 
     return {
-        "prophet_forecast": prophet_forecast,
+        "prophet_forecast": prophet_output,
         "lightgbm_model": lightgbm_model,
+        "comparison": comparison,
+        "best_model": best_model,
         "train": train_df,
         "validation": validation_df,
         "test": test_df,
