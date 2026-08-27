@@ -3,19 +3,60 @@ import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
+def _validate_metric_inputs(
+    actual,
+    predicted,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Validate and convert metric inputs."""
+
+    actual_array = np.asarray(
+        actual,
+        dtype=float,
+    )
+
+    predicted_array = np.asarray(
+        predicted,
+        dtype=float,
+    )
+
+    if actual_array.ndim != 1 or predicted_array.ndim != 1:
+        raise ValueError(
+            "Actual and predicted values must be one-dimensional."
+        )
+
+    if len(actual_array) != len(predicted_array):
+        raise ValueError(
+            "Actual and predicted values must have the same length."
+        )
+
+    if len(actual_array) == 0:
+        raise ValueError(
+            "Cannot evaluate an empty forecast."
+        )
+
+    if not np.isfinite(actual_array).all():
+        raise ValueError(
+            "Actual values contain NaN or infinite values."
+        )
+
+    if not np.isfinite(predicted_array).all():
+        raise ValueError(
+            "Predicted values contain NaN or infinite values."
+        )
+
+    return actual_array, predicted_array
+
+
 def calculate_mae(
     actual,
     predicted,
 ) -> float:
     """Calculate Mean Absolute Error."""
 
-    actual_array = np.asarray(actual, dtype=float)
-    predicted_array = np.asarray(predicted, dtype=float)
-
-    if len(actual_array) != len(predicted_array):
-        raise ValueError(
-            "Actual and predicted values must have the same length."
-        )
+    actual_array, predicted_array = _validate_metric_inputs(
+        actual,
+        predicted,
+    )
 
     return float(
         mean_absolute_error(
@@ -31,13 +72,10 @@ def calculate_rmse(
 ) -> float:
     """Calculate Root Mean Squared Error."""
 
-    actual_array = np.asarray(actual, dtype=float)
-    predicted_array = np.asarray(predicted, dtype=float)
-
-    if len(actual_array) != len(predicted_array):
-        raise ValueError(
-            "Actual and predicted values must have the same length."
-        )
+    actual_array, predicted_array = _validate_metric_inputs(
+        actual,
+        predicted,
+    )
 
     mse = mean_squared_error(
         actual_array,
@@ -53,73 +91,47 @@ def calculate_mape(
 ) -> float:
     """
     Calculate MAPE while excluding zero actual values.
-    Returns percentage.
+
+    Returns:
+        MAPE as a percentage.
     """
 
-    actual_array = np.asarray(
+    actual_array, predicted_array = _validate_metric_inputs(
         actual,
-        dtype=float,
-    )
-
-    predicted_array = np.asarray(
         predicted,
-        dtype=float,
     )
-
-    if len(actual_array) != len(predicted_array):
-        raise ValueError(
-            "Actual and predicted values must have the same length."
-        )
 
     non_zero_mask = actual_array != 0
 
     if not np.any(non_zero_mask):
         return 0.0
 
-    actual_non_zero = actual_array[
-        non_zero_mask
-    ]
+    actual_non_zero = actual_array[non_zero_mask]
+    predicted_non_zero = predicted_array[non_zero_mask]
 
-    predicted_non_zero = predicted_array[
-        non_zero_mask
-    ]
-
-    mape = np.mean(
-        np.abs(
-            (
-                actual_non_zero
-                - predicted_non_zero
+    return float(
+        np.mean(
+            np.abs(
+                (
+                    actual_non_zero - predicted_non_zero
+                )
+                / actual_non_zero
             )
-            / actual_non_zero
         )
+        * 100
     )
-
-    return float(mape * 100)
 
 
 def calculate_wape(
     actual,
     predicted,
 ) -> float:
-    """
-    Calculate Weighted Absolute Percentage Error.
-    Returns percentage.
-    """
+    """Calculate Weighted Absolute Percentage Error."""
 
-    actual_array = np.asarray(
+    actual_array, predicted_array = _validate_metric_inputs(
         actual,
-        dtype=float,
-    )
-
-    predicted_array = np.asarray(
         predicted,
-        dtype=float,
     )
-
-    if len(actual_array) != len(predicted_array):
-        raise ValueError(
-            "Actual and predicted values must have the same length."
-        )
 
     denominator = np.sum(
         np.abs(actual_array)
@@ -143,27 +155,12 @@ def evaluate_forecast(
     actual,
     predicted,
 ) -> dict:
-    """Calculate all forecasting metrics."""
+    """Calculate all supported forecasting metrics."""
 
-    actual_array = np.asarray(
+    actual_array, predicted_array = _validate_metric_inputs(
         actual,
-        dtype=float,
-    )
-
-    predicted_array = np.asarray(
         predicted,
-        dtype=float,
     )
-
-    if len(actual_array) != len(predicted_array):
-        raise ValueError(
-            "Actual and predicted values must have the same length."
-        )
-
-    if len(actual_array) == 0:
-        raise ValueError(
-            "Cannot evaluate an empty forecast."
-        )
 
     return {
         "mae": calculate_mae(
@@ -190,7 +187,12 @@ def evaluate_forecast_dataframe(
     actual_column: str = "actual_demand",
     predicted_column: str = "predicted_demand",
 ) -> dict:
-    """Evaluate predictions stored in a dataframe."""
+    """Evaluate predictions contained in a dataframe."""
+
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError(
+            "dataframe must be a pandas DataFrame."
+        )
 
     required_columns = {
         actual_column,
@@ -222,21 +224,27 @@ def evaluate_forecast_dataframe(
     )
 
 
-def compare_models(
-    prophet_metrics: dict,
-    lightgbm_metrics: dict,
+def create_evaluation_dataframe(
+    actual,
+    predicted,
+    model_name: str,
 ) -> pd.DataFrame:
-    """Create a comparison table for Prophet and LightGBM."""
+    """Create row-level actual versus predicted data."""
 
-    rows = [
-        {
-            "model_name": "Prophet",
-            **prophet_metrics,
-        },
-        {
-            "model_name": "LightGBM",
-            **lightgbm_metrics,
-        },
-    ]
+    actual_array, predicted_array = _validate_metric_inputs(
+        actual,
+        predicted,
+    )
 
-    return pd.DataFrame(rows)
+    if not isinstance(model_name, str) or not model_name.strip():
+        raise ValueError(
+            "model_name is required."
+        )
+
+    return pd.DataFrame(
+        {
+            "actual_demand": actual_array,
+            "predicted_demand": predicted_array,
+            "model_name": model_name,
+        }
+    )
