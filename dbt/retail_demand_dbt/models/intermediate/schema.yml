@@ -2,6 +2,7 @@ version: 2
 
 models:
 
+<<<<<<< HEAD
   - name: int_sales_calendar_mapping
     description: >
       Maps each M5 daily sales column to its corresponding
@@ -85,3 +86,35 @@ models:
       grain: "One row per item-store-date"
       upstream_models:
         - int_sales_with_prices
+=======
+  - name: int_daily_sales
+    description: >
+      M5 sales data converted from wide daily columns
+      into one record per item-store-date.
+
+    columns:
+
+      - name: id
+        tests:
+          - not_null
+
+      - name: item_id
+        tests:
+          - not_null
+
+      - name: store_id
+        tests:
+          - not_null
+
+      - name: date
+        tests:
+          - not_null
+
+      - name: sales
+        tests:
+          - not_null
+
+
+
+
+>>>>>>> Sangeetha
