@@ -1,3 +1,5 @@
+import pandas as pd
+
 from src.validation.pipeline_validation import (
     validate_all_data
 )
@@ -412,16 +414,22 @@ logger = logging.getLogger(__name__)
 
 
 def run_forecasting_pipeline():
-    """Run the Week 3 Day 3 forecasting pipeline."""
+
+    """Run the Week 3 Day 4 forecasting pipeline."""
 
     logger.info(
-        "Starting Week 3 Day 3 forecasting pipeline."
+        "Starting Week 3 Day 4 forecasting pipeline."
     )
 
     daily_sales = load_daily_sales()
 
     validate_daily_sales(
         daily_sales
+    )
+
+    logger.info(
+        "Loaded %s rows of daily sales.",
+        len(daily_sales),
     )
 
     train_df, validation_df, test_df = chronological_split(
@@ -440,7 +448,7 @@ def run_forecasting_pipeline():
     )
 
     logger.info(
-        "Training Prophet."
+        "Preparing Prophet training data."
     )
 
     prophet_train = prepare_prophet_data(
@@ -457,7 +465,7 @@ def run_forecasting_pipeline():
     )
 
     logger.info(
-        "Prophet generated %s forecast rows.",
+        "Prophet forecast generated: %s rows.",
         len(prophet_output),
     )
 
@@ -473,29 +481,37 @@ def run_forecasting_pipeline():
         subset=DEFAULT_FEATURES + ["sales"]
     )
 
+    if lightgbm_train.empty:
+        raise ValueError(
+            "No valid LightGBM training rows available."
+        )
+
     lightgbm_model = train_lightgbm_model(
-        lightgbm_train
+        lightgbm_train,
+        DEFAULT_FEATURES,
     )
 
     logger.info(
-        "LightGBM model trained."
+        "LightGBM model trained successfully."
     )
 
     logger.info(
         "Preparing LightGBM validation features."
     )
 
-    combined_history = daily_sales[
-        daily_sales["date"] <= validation_df["date"].max()
-    ].copy()
-
     validation_features = prepare_lightgbm_features(
-        combined_history
+        daily_sales[
+            daily_sales["date"] <= validation_df["date"].max()
+        ].copy()
+    )
+
+    validation_dates = set(
+        validation_df["date"].dt.normalize()
     )
 
     validation_features = validation_features[
-        validation_features["date"].isin(
-            validation_df["date"]
+        validation_features["date"].dt.normalize().isin(
+            validation_dates
         )
     ].copy()
 
@@ -523,8 +539,12 @@ def run_forecasting_pipeline():
         )
 
         logger.info(
-            "LightGBM metrics: %s",
+            "LightGBM validation metrics: %s",
             lightgbm_metrics,
+        )
+    else:
+        logger.warning(
+            "No valid LightGBM validation rows available."
         )
 
     logger.info(
@@ -535,21 +555,13 @@ def run_forecasting_pipeline():
         train_df
     )
 
-    prophet_validation_model_forecast = train_and_forecast_prophet(
+    prophet_validation_forecast = train_and_forecast_prophet(
         prophet_validation_train,
         periods=30,
     )
 
-    prophet_actual = validation_df[
-        ["date", "sales"]
-    ].copy()
-
-    prophet_actual["date"] = pd.to_datetime(
-        prophet_actual["date"]
-    )
-
-    prophet_predictions = (
-        prophet_validation_model_forecast
+    prophet_validation_predictions = (
+        prophet_validation_forecast
         .rename(
             columns={
                 "ds": "date",
@@ -559,8 +571,20 @@ def run_forecasting_pipeline():
         [["date", "predicted_demand"]]
     )
 
+    prophet_actual = validation_df[
+        ["date", "sales"]
+    ].copy()
+
+    prophet_actual["date"] = pd.to_datetime(
+        prophet_actual["date"]
+    ).dt.normalize()
+
+    prophet_validation_predictions["date"] = pd.to_datetime(
+        prophet_validation_predictions["date"]
+    ).dt.normalize()
+
     prophet_validation = prophet_actual.merge(
-        prophet_predictions,
+        prophet_validation_predictions,
         on="date",
         how="inner",
     )
@@ -577,9 +601,16 @@ def run_forecasting_pipeline():
         )
 
         logger.info(
-            "Prophet metrics: %s",
+            "Prophet validation metrics: %s",
             prophet_metrics,
         )
+    else:
+        logger.warning(
+            "No valid Prophet validation rows available."
+        )
+
+    comparison = None
+    best_model = None
 
     if model_metrics:
         comparison = compare_model_metrics(
@@ -600,16 +631,9 @@ def run_forecasting_pipeline():
             "Best model based on WAPE: %s",
             best_model,
         )
-    else:
-        comparison = None
-        best_model = None
-
-        logger.warning(
-            "No model metrics were generated."
-        )
 
     logger.info(
-        "Week 3 Day 3 forecasting pipeline completed."
+        "Week 3 Day 4 forecasting pipeline completed."
     )
 
     return {
