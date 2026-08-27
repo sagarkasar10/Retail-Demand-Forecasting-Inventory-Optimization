@@ -19,17 +19,48 @@ DEFAULT_FEATURES = [
     "rolling_mean_28",
 ]
 
+OPTIONAL_FEATURES = [
+    "sell_price",
+    "price_change",
+]
+
 
 def create_lightgbm_model(
     n_estimators: int = 300,
     learning_rate: float = 0.05,
     max_depth: int = 8,
     num_leaves: int = 31,
+    min_child_samples: int = 20,
+    subsample: float = 0.8,
+    colsample_bytree: float = 0.8,
     random_state: int = 42,
 ) -> LGBMRegressor:
-    """
-    Create a LightGBM regression model.
-    """
+    """Create a LightGBM regression model."""
+
+    if n_estimators <= 0:
+        raise ValueError(
+            "n_estimators must be greater than zero."
+        )
+
+    if learning_rate <= 0:
+        raise ValueError(
+            "learning_rate must be greater than zero."
+        )
+
+    if num_leaves <= 1:
+        raise ValueError(
+            "num_leaves must be greater than one."
+        )
+
+    if not 0 < subsample <= 1:
+        raise ValueError(
+            "subsample must be between 0 and 1."
+        )
+
+    if not 0 < colsample_bytree <= 1:
+        raise ValueError(
+            "colsample_bytree must be between 0 and 1."
+        )
 
     return LGBMRegressor(
         objective="regression",
@@ -37,18 +68,19 @@ def create_lightgbm_model(
         learning_rate=learning_rate,
         max_depth=max_depth,
         num_leaves=num_leaves,
+        min_child_samples=min_child_samples,
+        subsample=subsample,
+        colsample_bytree=colsample_bytree,
         random_state=random_state,
         verbosity=-1,
     )
 
 
-def prepare_training_data(
+def get_available_features(
     dataframe: pd.DataFrame,
     feature_columns: Optional[list] = None,
-):
-    """
-    Prepare X and y for LightGBM training.
-    """
+) -> list:
+    """Return requested features that exist in the dataframe."""
 
     features = feature_columns or DEFAULT_FEATURES
 
@@ -62,6 +94,20 @@ def prepare_training_data(
             f"{sorted(missing_columns)}"
         )
 
+    return features
+
+
+def prepare_training_data(
+    dataframe: pd.DataFrame,
+    feature_columns: Optional[list] = None,
+):
+    """Prepare X and y for LightGBM training."""
+
+    features = get_available_features(
+        dataframe,
+        feature_columns,
+    )
+
     if "sales" not in dataframe.columns:
         raise ValueError(
             "Training dataframe must contain sales."
@@ -70,6 +116,11 @@ def prepare_training_data(
     training_df = dataframe[
         features + ["sales"]
     ].copy()
+
+    training_df = training_df.replace(
+        [float("inf"), float("-inf")],
+        pd.NA,
+    )
 
     training_df = training_df.dropna(
         subset=features + ["sales"]
@@ -90,9 +141,7 @@ def train_lightgbm_model(
     dataframe: pd.DataFrame,
     feature_columns: Optional[list] = None,
 ) -> LGBMRegressor:
-    """
-    Train a LightGBM regression model.
-    """
+    """Train a LightGBM regression model."""
 
     X, y = prepare_training_data(
         dataframe,
@@ -111,21 +160,12 @@ def predict_lightgbm(
     dataframe: pd.DataFrame,
     feature_columns: Optional[list] = None,
 ) -> pd.Series:
-    """
-    Generate LightGBM predictions.
-    """
+    """Generate LightGBM predictions."""
 
-    features = feature_columns or DEFAULT_FEATURES
-
-    missing_columns = set(features) - set(
-        dataframe.columns
+    features = get_available_features(
+        dataframe,
+        feature_columns,
     )
-
-    if missing_columns:
-        raise ValueError(
-            f"Missing LightGBM features: "
-            f"{sorted(missing_columns)}"
-        )
 
     X = dataframe[features].copy()
 
@@ -146,3 +186,30 @@ def predict_lightgbm(
         index=dataframe.index,
         name="predicted_demand",
     ).clip(lower=0)
+
+
+def get_feature_importance(
+    model: LGBMRegressor,
+    feature_columns: Optional[list] = None,
+) -> pd.DataFrame:
+    """Return LightGBM feature importance."""
+
+    features = feature_columns or DEFAULT_FEATURES
+
+    if len(features) != len(model.feature_importances_):
+        raise ValueError(
+            "Number of feature names does not match "
+            "the trained model."
+        )
+
+    importance = pd.DataFrame(
+        {
+            "feature": features,
+            "importance": model.feature_importances_,
+        }
+    )
+
+    return importance.sort_values(
+        "importance",
+        ascending=False,
+    ).reset_index(drop=True)
