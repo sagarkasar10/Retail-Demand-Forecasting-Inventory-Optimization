@@ -84,7 +84,13 @@ from src.forecasting.prophet_model import (
 )
 from src.forecasting.lightgbm_features import (
     prepare_lightgbm_features,
+     get_feature_columns,
 )
+from src.forecasting.lightgbm_tuning import (
+    tune_lightgbm,
+    get_best_parameters,
+)
+
 from src.forecasting.lightgbm_model import (
     train_lightgbm_model,
     predict_lightgbm,
@@ -93,6 +99,13 @@ from src.forecasting.lightgbm_model import (
 from src.forecasting.evaluation import (
     evaluate_forecast,
 )
+
+from src.forecasting.forecast_service import (
+    create_lightgbm_forecast_output,
+    calculate_forecast_summary,
+    validate_forecast_output,
+)
+
 from src.forecasting.model_comparison import (
     evaluate_model_predictions,
     compare_model_metrics,
@@ -414,11 +427,10 @@ logger = logging.getLogger(__name__)
 
 
 def run_forecasting_pipeline():
-
-    """Run the Week 3 Day 4 forecasting pipeline."""
+    """Run the Week 3 Day 5 LightGBM pipeline."""
 
     logger.info(
-        "Starting Week 3 Day 4 forecasting pipeline."
+        "Starting Week 3 Day 5 LightGBM pipeline."
     )
 
     daily_sales = load_daily_sales()
@@ -428,7 +440,7 @@ def run_forecasting_pipeline():
     )
 
     logger.info(
-        "Loaded %s rows of daily sales.",
+        "Loaded %s sales rows.",
         len(daily_sales),
     )
 
@@ -439,7 +451,7 @@ def run_forecasting_pipeline():
     )
 
     logger.info(
-        "Split summary: %s",
+        "Data split: %s",
         get_split_summary(
             train_df,
             validation_df,
@@ -448,61 +460,46 @@ def run_forecasting_pipeline():
     )
 
     logger.info(
-        "Preparing Prophet training data."
+        "Creating LightGBM training features."
     )
 
-    prophet_train = prepare_prophet_data(
+    train_features = prepare_lightgbm_features(
         train_df
     )
 
-    prophet_forecast = train_and_forecast_prophet(
-        prophet_train,
-        periods=30,
+    train_features = train_features.dropna(
+        subset=["sales"]
     )
 
-    prophet_output = create_prophet_forecast_output(
-        prophet_forecast
+    feature_columns = get_feature_columns(
+        train_features
     )
 
-    logger.info(
-        "Prophet forecast generated: %s rows.",
-        len(prophet_output),
+    train_features = train_features.dropna(
+        subset=feature_columns + ["sales"]
     )
 
-    logger.info(
-        "Preparing LightGBM training features."
-    )
-
-    lightgbm_train = prepare_lightgbm_features(
-        train_df
-    )
-
-    lightgbm_train = lightgbm_train.dropna(
-        subset=DEFAULT_FEATURES + ["sales"]
-    )
-
-    if lightgbm_train.empty:
+    if train_features.empty:
         raise ValueError(
             "No valid LightGBM training rows available."
         )
 
-    lightgbm_model = train_lightgbm_model(
-        lightgbm_train,
-        DEFAULT_FEATURES,
+    logger.info(
+        "LightGBM feature count: %s",
+        len(feature_columns),
     )
 
     logger.info(
-        "LightGBM model trained successfully."
+        "Creating validation features."
     )
 
-    logger.info(
-        "Preparing LightGBM validation features."
-    )
+    history_until_validation = daily_sales[
+        daily_sales["date"]
+        <= validation_df["date"].max()
+    ].copy()
 
     validation_features = prepare_lightgbm_features(
-        daily_sales[
-            daily_sales["date"] <= validation_df["date"].max()
-        ].copy()
+        history_until_validation
     )
 
     validation_dates = set(
@@ -510,141 +507,162 @@ def run_forecasting_pipeline():
     )
 
     validation_features = validation_features[
-        validation_features["date"].dt.normalize().isin(
-            validation_dates
-        )
+        validation_features["date"]
+        .dt.normalize()
+        .isin(validation_dates)
     ].copy()
 
     validation_features = validation_features.dropna(
-        subset=DEFAULT_FEATURES + ["sales"]
+        subset=feature_columns + ["sales"]
     )
 
-    model_metrics = []
-
-    if not validation_features.empty:
-        lightgbm_predictions = predict_lightgbm(
-            lightgbm_model,
-            validation_features,
-            DEFAULT_FEATURES,
-        )
-
-        lightgbm_metrics = evaluate_model_predictions(
-            validation_features["sales"],
-            lightgbm_predictions,
-            "LightGBM",
-        )
-
-        model_metrics.append(
-            lightgbm_metrics
-        )
-
-        logger.info(
-            "LightGBM validation metrics: %s",
-            lightgbm_metrics,
-        )
-    else:
-        logger.warning(
+    if validation_features.empty:
+        raise ValueError(
             "No valid LightGBM validation rows available."
         )
 
     logger.info(
-        "Evaluating Prophet on the validation period."
+        "Tuning LightGBM parameters."
     )
 
-    prophet_validation_train = prepare_prophet_data(
-        train_df
+    best_model, tuning_results = tune_lightgbm(
+        train_df=train_features,
+        validation_df=validation_features,
+        feature_columns=feature_columns,
     )
 
-    prophet_validation_forecast = train_and_forecast_prophet(
-        prophet_validation_train,
-        periods=30,
+    best_parameters = get_best_parameters(
+        tuning_results
     )
-
-    prophet_validation_predictions = (
-        prophet_validation_forecast
-        .rename(
-            columns={
-                "ds": "date",
-                "yhat": "predicted_demand",
-            }
-        )
-        [["date", "predicted_demand"]]
-    )
-
-    prophet_actual = validation_df[
-        ["date", "sales"]
-    ].copy()
-
-    prophet_actual["date"] = pd.to_datetime(
-        prophet_actual["date"]
-    ).dt.normalize()
-
-    prophet_validation_predictions["date"] = pd.to_datetime(
-        prophet_validation_predictions["date"]
-    ).dt.normalize()
-
-    prophet_validation = prophet_actual.merge(
-        prophet_validation_predictions,
-        on="date",
-        how="inner",
-    )
-
-    if not prophet_validation.empty:
-        prophet_metrics = evaluate_model_predictions(
-            prophet_validation["sales"],
-            prophet_validation["predicted_demand"],
-            "Prophet",
-        )
-
-        model_metrics.append(
-            prophet_metrics
-        )
-
-        logger.info(
-            "Prophet validation metrics: %s",
-            prophet_metrics,
-        )
-    else:
-        logger.warning(
-            "No valid Prophet validation rows available."
-        )
-
-    comparison = None
-    best_model = None
-
-    if model_metrics:
-        comparison = compare_model_metrics(
-            model_metrics
-        )
-
-        best_model = select_best_model(
-            comparison,
-            metric="wape",
-        )
-
-        logger.info(
-            "Model comparison:\n%s",
-            comparison.to_string(index=False),
-        )
-
-        logger.info(
-            "Best model based on WAPE: %s",
-            best_model,
-        )
 
     logger.info(
-        "Week 3 Day 4 forecasting pipeline completed."
+        "Best LightGBM parameters: %s",
+        best_parameters,
+    )
+
+    logger.info(
+        "LightGBM tuning results:\n%s",
+        tuning_results.to_string(index=False),
+    )
+
+    validation_predictions = predict_lightgbm(
+        best_model,
+        validation_features,
+        feature_columns,
+    )
+
+    validation_metrics = evaluate_model_predictions(
+        validation_features["sales"],
+        validation_predictions,
+        "LightGBM",
+    )
+
+    logger.info(
+        "LightGBM validation metrics: %s",
+        validation_metrics,
+    )
+
+    validation_output = create_lightgbm_forecast_output(
+        validation_features,
+        validation_predictions,
+        model_name="LightGBM",
+    )
+
+    validate_forecast_output(
+        validation_output
+    )
+
+    logger.info(
+        "Validation forecast summary: %s",
+        calculate_forecast_summary(
+            validation_output
+        ),
+    )
+
+    logger.info(
+        "Preparing test forecast features."
+    )
+
+    history_until_test = daily_sales[
+        daily_sales["date"]
+        <= test_df["date"].max()
+    ].copy()
+
+    test_features = prepare_lightgbm_features(
+        history_until_test
+    )
+
+    test_dates = set(
+        test_df["date"].dt.normalize()
+    )
+
+    test_features = test_features[
+        test_features["date"]
+        .dt.normalize()
+        .isin(test_dates)
+    ].copy()
+
+    test_features = test_features.dropna(
+        subset=feature_columns + ["sales"]
+    )
+
+    if test_features.empty:
+        raise ValueError(
+            "No valid LightGBM test rows available."
+        )
+
+    test_predictions = predict_lightgbm(
+        best_model,
+        test_features,
+        feature_columns,
+    )
+
+    test_metrics = evaluate_model_predictions(
+        test_features["sales"],
+        test_predictions,
+        "LightGBM",
+    )
+
+    logger.info(
+        "LightGBM test metrics: %s",
+        test_metrics,
+    )
+
+    test_output = create_lightgbm_forecast_output(
+        test_features,
+        test_predictions,
+        model_name="LightGBM",
+    )
+
+    validate_forecast_output(
+        test_output
+    )
+
+    logger.info(
+        "Test forecast summary: %s",
+        calculate_forecast_summary(
+            test_output
+        ),
+    )
+
+    logger.info(
+        "Week 3 Day 5 LightGBM pipeline completed."
     )
 
     return {
-        "prophet_forecast": prophet_output,
-        "lightgbm_model": lightgbm_model,
-        "comparison": comparison,
-        "best_model": best_model,
-        "train": train_df,
-        "validation": validation_df,
-        "test": test_df,
+        "model": best_model,
+        "best_parameters": best_parameters,
+        "tuning_results": tuning_results,
+        "validation_metrics": validation_metrics,
+        "test_metrics": test_metrics,
+        "validation_forecast": validation_output,
+        "test_forecast": test_output,
+        "feature_columns": feature_columns,
+        "train": train_features,
+        "validation": validation_features,
+        "test": test_features,
     }
+
 
 if __name__ == "__main__":
     main()
