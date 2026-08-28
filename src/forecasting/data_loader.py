@@ -174,6 +174,32 @@ def load_forecasting_series(
     )
 
     return dataframe
+def get_forecasting_date_range(
+    dataframe: pd.DataFrame,
+) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """Return the minimum and maximum available sales dates."""
+
+    if dataframe.empty:
+        raise ValueError(
+            "Cannot determine date range from an empty dataframe."
+        )
+
+    if "date" not in dataframe.columns:
+        raise ValueError(
+            "Dataframe must contain a date column."
+        )
+
+    dates = pd.to_datetime(
+        dataframe["date"],
+        errors="coerce",
+    ).dropna()
+
+    if dates.empty:
+        raise ValueError(
+            "No valid dates found in dataframe."
+        )
+
+    return dates.min(), dates.max()
 
 
 def validate_daily_sales(dataframe: pd.DataFrame) -> None:
