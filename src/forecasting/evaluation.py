@@ -151,6 +151,24 @@ def calculate_wape(
     )
 
 
+def calculate_bias(
+    actual,
+    predicted,
+) -> float:
+    """Calculate mean forecast bias."""
+
+    actual_array, predicted_array = _validate_metric_inputs(
+        actual,
+        predicted,
+    )
+
+    return float(
+        np.mean(
+            predicted_array - actual_array
+        )
+    )
+
+
 def evaluate_forecast(
     actual,
     predicted,
@@ -163,31 +181,36 @@ def evaluate_forecast(
     )
 
     return {
-        "mae": calculate_mae(
-            actual_array,
-            predicted_array,
-        ),
-        "rmse": calculate_rmse(
-            actual_array,
-            predicted_array,
-        ),
-        "mape": calculate_mape(
-            actual_array,
-            predicted_array,
-        ),
-        "wape": calculate_wape(
-            actual_array,
-            predicted_array,
-        ),
-    }
+    "mae": calculate_mae(
+        actual_array,
+        predicted_array,
+    ),
+    "rmse": calculate_rmse(
+        actual_array,
+        predicted_array,
+    ),
+    "mape": calculate_mape(
+        actual_array,
+        predicted_array,
+    ),
+    "wape": calculate_wape(
+        actual_array,
+        predicted_array,
+    ),
+     "bias": calculate_bias(
+        actual_array,
+        predicted_array,
+    ),
+}
 
 
 def evaluate_forecast_dataframe(
     dataframe: pd.DataFrame,
     actual_column: str = "actual_demand",
     predicted_column: str = "predicted_demand",
+    model_name: str = "Unknown",
 ) -> dict:
-    """Evaluate predictions contained in a dataframe."""
+    """Evaluate a dataframe containing actual and predicted demand."""
 
     if not isinstance(dataframe, pd.DataFrame):
         raise TypeError(
@@ -218,18 +241,25 @@ def evaluate_forecast_dataframe(
             "No valid rows available for evaluation."
         )
 
-    return evaluate_forecast(
+    metrics = evaluate_forecast(
         evaluation_df[actual_column],
         evaluation_df[predicted_column],
     )
 
+    metrics["model_name"] = model_name
+    metrics["rows_evaluated"] = len(
+        evaluation_df
+    )
+
+    return metrics
 
 def create_evaluation_dataframe(
     actual,
     predicted,
     model_name: str,
+    forecast_date=None,
 ) -> pd.DataFrame:
-    """Create row-level actual versus predicted data."""
+    """Create row-level model evaluation data."""
 
     actual_array, predicted_array = _validate_metric_inputs(
         actual,
@@ -241,10 +271,91 @@ def create_evaluation_dataframe(
             "model_name is required."
         )
 
-    return pd.DataFrame(
+    output = pd.DataFrame(
         {
             "actual_demand": actual_array,
             "predicted_demand": predicted_array,
             "model_name": model_name,
         }
+    )
+
+    if forecast_date is not None:
+        dates = pd.to_datetime(
+            forecast_date,
+            errors="coerce",
+        )
+
+        if len(dates) != len(output):
+            raise ValueError(
+                "forecast_date length does not match predictions."
+            )
+
+        output["forecast_date"] = dates
+
+    output["error"] = (
+        output["predicted_demand"]
+        - output["actual_demand"]
+    )
+
+    output["absolute_error"] = (
+        output["error"].abs()
+    )
+
+    return output
+
+
+def compare_models(
+    metrics: list[dict],
+    ranking_metric: str = "wape",
+) -> pd.DataFrame:
+    """Rank forecasting models by the selected metric."""
+
+    if not metrics:
+        raise ValueError(
+            "At least one model metric is required."
+        )
+
+    dataframe = pd.DataFrame(metrics)
+
+    if ranking_metric not in dataframe.columns:
+        raise ValueError(
+            f"Ranking metric '{ranking_metric}' "
+            "is not available."
+        )
+
+    return dataframe.sort_values(
+        ranking_metric,
+        ascending=True,
+    ).reset_index(drop=True)
+
+
+def select_best_model(
+    metrics: list[dict] | pd.DataFrame,
+    ranking_metric: str = "wape",
+) -> str:
+    """Return the best model based on the selected metric."""
+
+    if isinstance(metrics, list):
+        dataframe = compare_models(
+            metrics,
+            ranking_metric,
+        )
+    else:
+        dataframe = metrics.sort_values(
+            ranking_metric,
+            ascending=True,
+        )
+
+    if dataframe.empty:
+        raise ValueError(
+            "No model metrics available."
+        )
+
+    if "model_name" not in dataframe.columns:
+        raise ValueError(
+            "Model metrics must contain model_name."
+        )
+
+    return str(
+        dataframe.iloc[0]["model_name"]
     )
