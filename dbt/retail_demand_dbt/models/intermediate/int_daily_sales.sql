@@ -8,11 +8,11 @@ WITH sales_source AS (
 calendar_days AS (
 
     SELECT
-        date,
-        ROW_NUMBER() OVER (ORDER BY date) AS day_number
-    FROM {{ ref('stg_calendar') }}
-
-),
+        day_number,
+        date
+    FROM {{ ref('int_sales_calendar_mapping') }}
+    
+)
 
 sales_json AS (
 
@@ -32,9 +32,7 @@ daily_sales AS (
         s.cat_id,
         s.store_id,
         s.state_id,
-
         CAST(REPLACE(day_column, 'd_', '') AS INT64) AS day_number,
-
         SAFE_CAST(
             JSON_VALUE(
                 s.sales_json,
