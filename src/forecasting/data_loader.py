@@ -172,8 +172,68 @@ def load_forecasting_series(
         dataframe["sales"],
         errors="coerce",
     )
+    if "sell_price" in dataframe.columns:
+        dataframe["sell_price"] = pd.to_numeric(
+            dataframe["sell_price"],
+            errors="coerce",
+        )
+
+    dataframe = dataframe.sort_values(
+        ["date", "store_id", "item_id"]
+    ).reset_index(drop=True)
+
 
     return dataframe
+
+def prepare_item_store_series(
+    dataframe: pd.DataFrame,
+    item_id: str,
+    store_id: str
+) -> pd.DataFrame:
+    """Prepare one item-store series for forecasting."""
+
+    required_columns = {
+        "date",
+        "item_id",
+        "store_id",
+        "sales",
+    }
+
+    missing = required_columns - set(
+        dataframe.columns
+    )
+
+    if missing:
+        raise ValueError(
+            f"Missing columns: {sorted(missing)}"
+        )
+
+    series = dataframe[
+        (dataframe["item_id"].astype(str) == str(item_id))
+        & (dataframe["store_id"].astype(str) == str(store_id))
+    ].copy()
+
+    if series.empty:
+        raise ValueError(
+            f"No data found for item={item_id}, "
+            f"store={store_id}."
+        )
+
+    series = (
+        series[
+            ["date", "item_id", "store_id", "sales"]
+        ]
+        .groupby(
+            ["date", "item_id", "store_id"],
+            as_index=False,
+        )
+        .agg({"sales": "sum"})
+        .sort_values("date")
+        .reset_index(drop=True)
+    )
+
+    return series
+
 def get_forecasting_date_range(
     dataframe: pd.DataFrame,
 ) -> tuple[pd.Timestamp, pd.Timestamp]:
