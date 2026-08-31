@@ -2,7 +2,6 @@
 
 ## Data Lineage
 
-text
 BigQuery Raw Tables
         |
         +-- raw_sales
@@ -24,6 +23,7 @@ BigQuery Raw Tables
         v
    Intermediate
         |
+        +-- int_sales_calender_mapping
         +-- int_daily_sales
         +-- int_sales_with_calendar
         +-- int_sales_with_prices
