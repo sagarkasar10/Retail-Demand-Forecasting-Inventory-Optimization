@@ -1,11 +1,11 @@
-SELECT
-    store_id,
-    item_id,
-    wm_yr_wk,
-    COUNT(*) AS record_count
-FROM {{ ref('int_sales_with_prices') }}
-GROUP BY
-    store_id,
-    item_id,
-    wm_yr_wk
-HAVING COUNT(*) > 7
+SELECT     
+    item_id,     
+    store_id,     
+    date,     
+    COUNT(*) AS record_count 
+FROM {{ ref('int_sales_with_prices') }} 
+GROUP BY     
+    item_id,     
+    store_id,     
+    date 
+HAVING COUNT(*) > 1 
