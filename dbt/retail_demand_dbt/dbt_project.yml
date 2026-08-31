@@ -1,4 +1,4 @@
-yaml
+
 name: 'retail_demand_dbt'
 
 version: '1.0.0'

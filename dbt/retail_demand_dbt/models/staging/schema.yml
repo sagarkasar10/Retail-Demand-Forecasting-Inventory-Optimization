@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 version: 2
 
 models:
@@ -70,3 +71,35 @@ models:
       - name: sell_price
         tests:
           - not_null
+=======
+models:
+
+  - name: stg_sales
+    description: >
+      Standardized representation of the Week 1 raw M5
+      sales table.
+
+    meta:
+      layer: "staging"
+      source: "retail_demand.raw_sales"
+      grain: "One row per item-store with daily sales columns"
+
+  - name: stg_calendar
+    description: >
+      Standardized M5 calendar containing dates, weeks,
+      events and SNAP information.
+
+    meta:
+      layer: "staging"
+      source: "retail_demand.raw_calendar"
+      grain: "One row per calendar date"
+
+  - name: stg_prices
+    description: >
+      Standardized M5 weekly item-store pricing data.
+
+    meta:
+      layer: "staging"
+      source: "retail_demand.raw_prices"
+      grain: "One row per item-store-week"
+>>>>>>> shelly_mittal
