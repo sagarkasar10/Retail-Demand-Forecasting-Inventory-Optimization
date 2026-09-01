@@ -1,34 +1,68 @@
 version: 2
 
 models:
+  - name: int_sales_calendar_mapping
+    description: "Maps M5 daily sales column numbers to calendar dates and weeks."
+    columns:
+      - name: day_number
+        tests: [not_null, unique]
+      - name: date
+        tests: [not_null]
+      - name: m5_yr_wk
+        tests: [not_null]
 
   - name: int_daily_sales
-    description: >
-      M5 sales data converted from wide daily columns
-      into one record per item-store-date.
-
+    description: "M5 sales converted from wide format to one row per item-store-date."
     columns:
-
       - name: id
-        tests:
-          - not_null
-
+        tests: [not_null]
       - name: item_id
-        tests:
-          - not_null
-
+        tests: [not_null]
       - name: store_id
-        tests:
-          - not_null
-
+        tests: [not_null]
       - name: date
-        tests:
-          - not_null
-
+        tests: [not_null]
       - name: sales
-        tests:
-          - not_null
+        tests: [not_null]
 
+  - name: int_sales_with_calendar
+    description: "Daily sales enriched with calendar, event and SNAP attributes."
+    columns:
+      - name: id
+        tests: [not_null]
+      - name: item_id
+        tests: [not_null]
+      - name: store_id
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: m5_yr_wk
+        tests: [not_null]
 
+  - name: int_sales_with_prices
+    description: "Calendar-enriched daily sales joined to weekly item-store prices."
+    columns:
+      - name: id
+        tests: [not_null]
+      - name: item_id
+        tests: [not_null]
+      - name: store_id
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
+      - name: sell_price
+        description: "Weekly selling price; may be null where no matching price exists."
+
+  - name: int_sales_events
+    description: "Price-enriched daily sales with consolidated event fields."
+    columns:
+      - name: id
+        tests: [not_null]
+      - name: item_id
+        tests: [not_null]
+      - name: store_id
+        tests: [not_null]
+      - name: date
+        tests: [not_null]
 
 
