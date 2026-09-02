@@ -1,15 +1,14 @@
 """
-Inventory dashboard page.
-
-This page provides a basic inventory recommendation interface
-using Week 3 forecast outputs.
+Inventory optimization dashboard page.
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
-from src.dashboard.data_access import get_forecast_data
+from src.dashboard.data_access import (
+    get_forecast_data,
+)
 from src.dashboard.inventory_service import (
     calculate_inventory_metrics,
 )
@@ -17,30 +16,32 @@ from src.dashboard.inventory_service import (
 
 def render_inventory() -> None:
     """
-    Render the inventory analysis page.
+    Render inventory optimization page.
     """
     st.title("Inventory Optimization")
 
     st.markdown(
         """
-        Use forecasted demand to estimate lead-time demand,
-        safety stock, reorder point, and recommended replenishment.
+        Estimate reorder points and recommended order quantities
+        from forecasted demand.
         """
     )
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     with col1:
         store_id = st.text_input(
             "Store ID",
-            placeholder="e.g. CA_1",
+            placeholder="CA_1",
         )
 
     with col2:
         item_id = st.text_input(
             "Item ID",
-            placeholder="e.g. FOODS_1_001",
+            placeholder="FOODS_1_001",
         )
+
+    col3, col4, col5 = st.columns(3)
 
     with col3:
         current_stock = st.number_input(
@@ -50,11 +51,9 @@ def render_inventory() -> None:
             step=1.0,
         )
 
-    col4, col5 = st.columns(2)
-
     with col4:
         lead_time_days = st.number_input(
-            "Lead Time (days)",
+            "Lead Time (Days)",
             min_value=1,
             value=7,
             step=1,
@@ -62,22 +61,22 @@ def render_inventory() -> None:
 
     with col5:
         safety_stock_days = st.number_input(
-            "Safety Stock (days)",
+            "Safety Stock (Days)",
             min_value=0,
             value=3,
             step=1,
         )
 
-    if not store_id or not item_id:
-        st.info(
-            "Enter a Store ID and Item ID to calculate inventory recommendations."
-        )
-        return
-
     if st.button(
-        "Calculate Inventory Recommendation",
+        "Calculate",
         type="primary",
     ):
+        if not store_id or not item_id:
+            st.error(
+                "Store ID and Item ID are required."
+            )
+            return
+
         try:
             forecast_df = get_forecast_data(
                 store_id=store_id,
@@ -86,7 +85,7 @@ def render_inventory() -> None:
 
             if forecast_df.empty:
                 st.warning(
-                    "No forecast data found for the selected store and item."
+                    "No forecast data found."
                 )
                 return
 
@@ -97,64 +96,107 @@ def render_inventory() -> None:
                 safety_stock_days=safety_stock_days,
             )
 
-            st.subheader("Inventory Summary")
+            st.subheader("Inventory KPIs")
 
-            metric_col1, metric_col2, metric_col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
 
-            with metric_col1:
+            with col1:
                 st.metric(
-                    "Forecast Demand",
-                    f"{metrics['forecast_demand']:,.0f}",
+                    "Average Daily Demand",
+                    f"{metrics['average_daily_demand']:,.1f}",
                 )
 
-            with metric_col2:
+            with col2:
+                st.metric(
+                    "Lead-Time Demand",
+                    f"{metrics['lead_time_demand']:,.1f}",
+                )
+
+            with col3:
                 st.metric(
                     "Reorder Point",
-                    f"{metrics['reorder_point']:,.0f}",
+                    f"{metrics['reorder_point']:,.1f}",
                 )
 
-            with metric_col3:
+            with col4:
                 st.metric(
                     "Recommended Order",
-                    f"{metrics['recommended_order_quantity']:,.0f}",
+                    f"{metrics['recommended_order_quantity']:,.1f}",
                 )
 
+            st.divider()
+
             if metrics["stockout_risk"]:
-                st.warning(
-                    "Stockout risk detected based on current stock "
-                    "and estimated lead-time demand."
+                st.error(
+                    "HIGH PRIORITY: Current stock may not cover "
+                    "expected lead-time demand."
                 )
             else:
                 st.success(
-                    "Current stock covers the estimated lead-time demand."
+                    "Current stock covers estimated lead-time demand."
                 )
 
-            st.subheader("Inventory Calculation")
+            st.subheader("Demand vs Current Stock")
 
-            st.write(
-                {
-                    "Current Stock": current_stock,
-                    "Average Daily Demand": round(
-                        metrics["average_daily_demand"],
-                        2,
-                    ),
-                    "Lead-Time Demand": round(
-                        metrics["lead_time_demand"],
-                        2,
-                    ),
-                    "Safety Stock": round(
-                        metrics["safety_stock"],
-                        2,
-                    ),
-                    "Reorder Point": round(
-                        metrics["reorder_point"],
-                        2,
-                    ),
-                    "Recommended Order Quantity": round(
-                        metrics["recommended_order_quantity"],
-                        2,
-                    ),
-                }
+            chart_data = {
+                "Current Stock": current_stock,
+                "Lead-Time Demand": (
+                    metrics["lead_time_demand"]
+                ),
+                "Safety Stock": (
+                    metrics["safety_stock"]
+                ),
+                "Reorder Point": (
+                    metrics["reorder_point"]
+                ),
+            }
+
+            st.bar_chart(
+                chart_data,
+                use_container_width=True,
+            )
+
+            st.subheader("Calculation Details")
+
+            st.dataframe(
+                [
+                    {
+                        "Metric": "Forecast Demand",
+                        "Value": metrics[
+                            "forecast_demand"
+                        ],
+                    },
+                    {
+                        "Metric": "Average Daily Demand",
+                        "Value": metrics[
+                            "average_daily_demand"
+                        ],
+                    },
+                    {
+                        "Metric": "Lead-Time Demand",
+                        "Value": metrics[
+                            "lead_time_demand"
+                        ],
+                    },
+                    {
+                        "Metric": "Safety Stock",
+                        "Value": metrics[
+                            "safety_stock"
+                        ],
+                    },
+                    {
+                        "Metric": "Reorder Point",
+                        "Value": metrics[
+                            "reorder_point"
+                        ],
+                    },
+                    {
+                        "Metric": "Recommended Order Quantity",
+                        "Value": metrics[
+                            "recommended_order_quantity"
+                        ],
+                    },
+                ],
             )
 
         except Exception as exc:
