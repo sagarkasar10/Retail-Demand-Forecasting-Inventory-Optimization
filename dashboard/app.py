@@ -1,11 +1,13 @@
 """
-Main Streamlit application for the Retail Demand Forecasting
-and Inventory Optimization dashboard.
+Main Streamlit application.
 """
 
 import streamlit as st
 
+from dashboard.pages.forecast import render_forecast
+from dashboard.pages.inventory import render_inventory
 from dashboard.pages.overview import render_overview
+from dashboard.pages.scenarios import render_scenarios
 
 
 st.set_page_config(
@@ -16,16 +18,29 @@ st.set_page_config(
 )
 
 
+def render_model_performance() -> None:
+    """
+    Temporary model-performance page.
+    """
+    st.title("Model Performance")
+
+    st.info(
+        "Model performance visualization will be implemented "
+        "in the next dashboard iteration."
+    )
+
+
 def render_sidebar() -> str:
     """
-    Render the application sidebar and return the selected page.
+    Render the application sidebar.
     """
     st.sidebar.title("Retail Analytics")
 
     st.sidebar.markdown(
         """
-        ### Retail Demand Forecasting
-        Demand forecasting and inventory optimization platform.
+        **Retail Demand Forecasting & Inventory Optimization**
+
+        Monitor demand, forecasts, inventory and scenarios.
         """
     )
 
@@ -43,53 +58,32 @@ def render_sidebar() -> str:
     st.sidebar.divider()
 
     st.sidebar.caption(
-        "Data source: BigQuery"
+        "Powered by BigQuery + Streamlit"
     )
 
     return page
 
 
-def render_placeholder(title: str, description: str) -> None:
-    """
-    Render a temporary page until the responsible team member
-    implements the complete page.
-    """
-    st.title(title)
-    st.info(description)
-
-
 def main() -> None:
     """
-    Main Streamlit application flow.
+    Main dashboard execution flow.
     """
-    page = render_sidebar()
+    page = render_sidebar()                                                               
 
     if page == "Overview":
         render_overview()
 
     elif page == "Demand Forecast":
-        render_placeholder(
-            "Demand Forecast",
-            "The demand forecast page will be implemented next.",
-        )
+        render_forecast()
 
     elif page == "Inventory":
-        render_placeholder(
-            "Inventory",
-            "The inventory analysis page will be implemented next.",
-        )
+        render_inventory()
 
     elif page == "What-if Scenarios":
-        render_placeholder(
-            "What-if Scenarios",
-            "The scenario analysis page will be implemented next.",
-        )
+        render_scenarios()
 
     elif page == "Model Performance":
-        render_placeholder(
-            "Model Performance",
-            "The model performance page will be implemented next.",
-        )
+        render_model_performance()
 
 
 if __name__ == "__main__":
