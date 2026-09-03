@@ -1,212 +1,180 @@
-"""
-What-if scenario service for the Week 4 dashboard.
+from typing import Dict
 
-The preferred scenario method is to pass modified price features
-through the trained LightGBM model from Week 3.
-
-This module intentionally does not change the production forecast
-table in BigQuery.
-"""
-
-from __future__ import annotations
-from typing import Any
-import numpy as np
 import pandas as pd
 
 
-MIN_PRICE = 0.0
-
-
-def validate_price_change(price_change_pct: float) -> None:
+def validate_price_change(
+    price_change_percent: float
+) -> None:
     """
-    Validate the requested percentage price change.
-
-    Example:
-        -10 means a 10% price decrease.
-        +10 means a 10% price increase.
+    Validate price scenario input.
     """
-    if price_change_pct <= -100:
+    if price_change_percent <= -100:
         raise ValueError(
             "Price cannot be reduced by 100% or more."
         )
 
+    if price_change_percent > 500:
+        raise ValueError(
+            "Price increase cannot exceed 500%."
+        )
+
+
+def validate_elasticity(
+    elasticity: float
+) -> None:
+    """
+    Validate price elasticity.
+    """
+    if elasticity > 0:
+        raise ValueError(
+            "For normal demand behavior, price elasticity "
+            "should be zero or negative."
+        )
+
+    if elasticity < -10:
+        raise ValueError(
+            "Elasticity value is outside the supported range."
+        )
+
+
+def calculate_demand_change_percent(
+    price_change_percent: float,
+    elasticity: float,
+) -> float:
+    """
+    Estimate percentage change in demand using price elasticity.
+    """
+    validate_price_change(price_change_percent)
+    validate_elasticity(elasticity)
+
+    return (
+        elasticity *
+        price_change_percent
+    )
+
 
 def apply_price_scenario(
-    df: pd.DataFrame,
-    price_change_pct: float,
+    forecast_df: pd.DataFrame,
+    price_change_percent: float,
+    elasticity: float,
 ) -> pd.DataFrame:
     """
-    Apply a price-change scenario to a forecast feature DataFrame.
-
-    The original DataFrame is not modified.
+    Apply price scenario to forecast demand.
     """
-    validate_price_change(price_change_pct)
-
-    if "sell_price" not in df.columns:
+    if forecast_df.empty:
         raise ValueError(
-            "Scenario data must contain sell_price."
+            "Forecast data cannot be empty."
         )
 
-    scenario_df = df.copy()
-
-    scenario_multiplier = (
-        1 + (price_change_pct / 100)
-    )
-
-    scenario_df["scenario_sell_price"] = (
-        pd.to_numeric(
-            scenario_df["sell_price"],
-            errors="coerce",
+    if "predicted_demand" not in forecast_df.columns:
+        raise ValueError(
+            "Forecast data must contain predicted_demand."
         )
-        .fillna(0)
-        .clip(lower=MIN_PRICE)
-        * scenario_multiplier
+
+    demand_change_percent = (
+        calculate_demand_change_percent(
+            price_change_percent,
+            elasticity,
+        )
     )
 
-    scenario_df["scenario_sell_price"] = (
-        scenario_df["scenario_sell_price"]
-        .clip(lower=MIN_PRICE)
+    scenario_df = forecast_df.copy()
+
+    scenario_df["base_demand"] = pd.to_numeric(
+        scenario_df["predicted_demand"],
+        errors="coerce"
+    ).fillna(0)
+
+    scenario_df["scenario_demand"] = (
+        scenario_df["base_demand"] *
+        (
+            1 +
+            demand_change_percent / 100
+        )
     )
+
+    scenario_df["scenario_demand"] = (
+        scenario_df["scenario_demand"]
+        .clip(lower=0)
+    )
+
+    scenario_df["demand_difference"] = (
+        scenario_df["scenario_demand"] -
+        scenario_df["base_demand"]
+    )
+
+    scenario_df["demand_difference_percent"] = (
+        scenario_df["demand_difference"] /
+        scenario_df["base_demand"].replace(0, pd.NA)
+    ) * 100
+
+    scenario_df[
+        "demand_difference_percent"
+    ] = scenario_df[
+        "demand_difference_percent"
+    ].fillna(0)
 
     return scenario_df
 
 
-def calculate_demand_difference(
-    base_demand: pd.Series | np.ndarray,
-    scenario_demand: pd.Series | np.ndarray,
-) -> pd.DataFrame:
+def estimate_price_elasticity_scenario(
+    forecast_df: pd.DataFrame,
+    price_change_percent: float,
+    elasticity: float = -1.0,
+) -> Dict[str, float]:
     """
-    Compare base and scenario predictions.
+    Return summarized impact of a price scenario.
     """
-    base = np.asarray(base_demand, dtype=float)
-    scenario = np.asarray(scenario_demand, dtype=float)
-
-    if len(base) != len(scenario):
-        raise ValueError(
-            "Base and scenario predictions must have the same length."
-        )
-
-    difference = scenario - base
-
-    percentage_change = np.where(
-        base != 0,
-        (difference / base) * 100,
-        np.nan,
-    )
-
-    return pd.DataFrame(
-        {
-            "base_demand": base,
-            "scenario_demand": scenario,
-            "demand_difference": difference,
-            "demand_change_pct": percentage_change,
-        }
-    )
-
-
-def run_lightgbm_scenario(
-    model: Any,
-    feature_df: pd.DataFrame,
-    price_change_pct: float,
-    feature_columns: list[str],
-    price_feature_name: str = "sell_price",
-) -> pd.DataFrame:
-    """
-    Generate scenario predictions using a trained LightGBM model.
-
-    The model is expected to have been trained in Week 3.
-
-    feature_df must contain:
-        - the model feature columns
-        - sell_price
-    """
-    validate_price_change(price_change_pct)
-
-    if price_feature_name not in feature_df.columns:
-        raise ValueError(
-            f"Missing required price feature: {price_feature_name}"
-        )
-
-    missing_features = [
-        column
-        for column in feature_columns
-        if column not in feature_df.columns
-    ]
-
-    if missing_features:
-        raise ValueError(
-            "Missing LightGBM features: "
-            f"{missing_features}"
-        )
-
     scenario_df = apply_price_scenario(
-        feature_df,
-        price_change_pct,
+        forecast_df,
+        price_change_percent,
+        elasticity,
     )
 
-    scenario_features = scenario_df[
-        feature_columns
-    ].copy()
-
-    scenario_features[price_feature_name] = (
-        scenario_df["scenario_sell_price"]
+    base_demand = float(
+        scenario_df["base_demand"].sum()
     )
 
-    scenario_prediction = model.predict(
-        scenario_features
+    scenario_demand = float(
+        scenario_df["scenario_demand"].sum()
     )
 
-    scenario_prediction = np.asarray(
-        scenario_prediction,
-        dtype=float,
+    demand_difference = (
+        scenario_demand -
+        base_demand
     )
 
-    scenario_prediction = np.clip(
-        scenario_prediction,
-        0,
-        None,
-    )
-
-    result = scenario_df.copy()
-
-    result["base_demand"] = np.clip(
-        np.asarray(
-            model.predict(
-                result[feature_columns]
-            ),
-            dtype=float,
+    return {
+        "base_demand": base_demand,
+        "scenario_demand": scenario_demand,
+        "demand_difference": demand_difference,
+        "demand_change_percent": (
+            0
+            if base_demand == 0
+            else (
+                demand_difference /
+                base_demand *
+                100
+            )
         ),
-        0,
-        None,
-    )
+    }
 
-    result["scenario_demand"] = scenario_prediction
 
-    comparison = calculate_demand_difference(
-        result["base_demand"],
-        result["scenario_demand"],
-    )
-
-    result[
-        [
-            "base_demand",
-            "scenario_demand",
-        ]
-    ] = comparison[
-        [
-            "base_demand",
-            "scenario_demand",
-        ]
-    ]
-
-    result["demand_difference"] = (
-        comparison["demand_difference"].values
-    )
-
-    result["demand_change_pct"] = (
-        comparison["demand_change_pct"].values
-    )
-
-    result["price_change_pct"] = price_change_pct
-
-    return result
+def summarize_scenario(
+    scenario_df: pd.DataFrame
+) -> Dict[str, float]:
+    """
+    Create summary metrics from scenario output.
+    """
+    return {
+        "base_demand": float(
+            scenario_df["base_demand"].sum()
+        ),
+        "scenario_demand": float(
+            scenario_df["scenario_demand"].sum()
+        ),
+        "demand_difference": float(
+            scenario_df["demand_difference"].sum()
+        ),
+    }
