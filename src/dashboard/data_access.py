@@ -863,3 +863,499 @@ def get_daily_sales(
         query,
         parameters,
     )
+
+
+import os
+from typing import Optional
+
+import pandas as pd
+from google.cloud import bigquery
+
+
+def get_bigquery_client() -> bigquery.Client:
+    """
+    Create and return a BigQuery client.
+
+    Google Cloud authentication is handled through the environment
+    configured for the project.
+    """
+    project_id = (
+        os.getenv("GCP_PROJECT_ID")
+        or os.getenv("GOOGLE_CLOUD_PROJECT")
+    )
+
+    if not project_id:
+        raise ValueError(
+            "GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT environment variable "
+            "must be configured."
+        )
+
+    return bigquery.Client(project=project_id)
+
+
+def _get_project_id() -> str:
+    project_id = (
+        os.getenv("GCP_PROJECT_ID")
+        or os.getenv("GOOGLE_CLOUD_PROJECT")
+    )
+
+    if not project_id:
+        raise ValueError(
+            "GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT environment variable "
+            "must be configured."
+        )
+
+    return project_id
+
+
+def _table_reference(table_name: str, dataset_name: str) -> str:
+    """
+    Build a fully-qualified BigQuery table reference.
+    """
+    project_id = _get_project_id()
+
+    return f"`{project_id}.{dataset_name}.{table_name}`"
+
+
+def _execute_query(
+    query: str,
+    query_parameters: Optional[list] = None
+) -> pd.DataFrame:
+    """
+    Execute a parameterized BigQuery query and return a DataFrame.
+    """
+    client = get_bigquery_client()
+
+    job_config = bigquery.QueryJobConfig()
+
+    if query_parameters:
+        job_config.query_parameters = query_parameters
+
+    query_job = client.query(
+        query,
+        job_config=job_config
+    )
+
+    return query_job.result().to_dataframe()
+
+
+def _get_dataset_name(environment_variable: str, default: str) -> str:
+    return os.getenv(environment_variable, default)
+
+
+def get_available_stores() -> list:
+    """
+    Return distinct store IDs available in forecast data.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("FORECAST_TABLE", "forecast_results")
+
+    query = f"""
+        SELECT DISTINCT store_id
+        FROM {_table_reference(table, dataset)}
+        WHERE store_id IS NOT NULL
+        ORDER BY store_id
+    """
+
+    df = _execute_query(query)
+
+    return df["store_id"].dropna().astype(str).tolist()
+
+
+def get_available_departments() -> list:
+    """
+    Return distinct department IDs available in forecast data.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("FORECAST_TABLE", "forecast_results")
+
+    query = f"""
+        SELECT DISTINCT dept_id
+        FROM {_table_reference(table, dataset)}
+        WHERE dept_id IS NOT NULL
+        ORDER BY dept_id
+    """
+
+    df = _execute_query(query)
+
+    return df["dept_id"].dropna().astype(str).tolist()
+
+
+def get_available_categories() -> list:
+    """
+    Return distinct category IDs available in forecast data.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("FORECAST_TABLE", "forecast_results")
+
+    query = f"""
+        SELECT DISTINCT cat_id
+        FROM {_table_reference(table, dataset)}
+        WHERE cat_id IS NOT NULL
+        ORDER BY cat_id
+    """
+
+    df = _execute_query(query)
+
+    return df["cat_id"].dropna().astype(str).tolist()
+
+
+def get_available_items(
+    store_id: Optional[str] = None,
+    dept_id: Optional[str] = None,
+    cat_id: Optional[str] = None
+) -> list:
+    """
+    Return items based on optional dashboard filters.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("FORECAST_TABLE", "forecast_results")
+
+    conditions = [
+        "item_id IS NOT NULL"
+    ]
+
+    parameters = []
+
+    if store_id:
+        conditions.append("store_id = @store_id")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "store_id",
+                "STRING",
+                store_id
+            )
+        )
+
+    if dept_id:
+        conditions.append("dept_id = @dept_id")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "dept_id",
+                "STRING",
+                dept_id
+            )
+        )
+
+    if cat_id:
+        conditions.append("cat_id = @cat_id")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "cat_id",
+                "STRING",
+                cat_id
+            )
+        )
+
+    query = f"""
+        SELECT DISTINCT item_id
+        FROM {_table_reference(table, dataset)}
+        WHERE {" AND ".join(conditions)}
+        ORDER BY item_id
+    """
+
+    df = _execute_query(
+        query,
+        parameters
+    )
+
+    return df["item_id"].dropna().astype(str).tolist()
+
+
+def get_available_models() -> list:
+    """
+    Return distinct forecasting model names.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("FORECAST_TABLE", "forecast_results")
+
+    query = f"""
+        SELECT DISTINCT model_name
+        FROM {_table_reference(table, dataset)}
+        WHERE model_name IS NOT NULL
+        ORDER BY model_name
+    """
+
+    df = _execute_query(query)
+
+    return df["model_name"].dropna().astype(str).tolist()
+
+
+def get_forecast_data(
+    store_id: Optional[str] = None,
+    dept_id: Optional[str] = None,
+    cat_id: Optional[str] = None,
+    item_id: Optional[str] = None,
+    model_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    Retrieve forecast data using dashboard filters.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("FORECAST_TABLE", "forecast_results")
+
+    conditions = [
+        "forecast_date IS NOT NULL"
+    ]
+
+    parameters = []
+
+    filter_values = [
+        ("store_id", store_id),
+        ("dept_id", dept_id),
+        ("cat_id", cat_id),
+        ("item_id", item_id),
+        ("model_name", model_name),
+    ]
+
+    for field, value in filter_values:
+        if value:
+            conditions.append(f"{field} = @{field}")
+            parameters.append(
+                bigquery.ScalarQueryParameter(
+                    field,
+                    "STRING",
+                    value
+                )
+            )
+
+    if start_date:
+        conditions.append("forecast_date >= @start_date")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "start_date",
+                "DATE",
+                start_date
+            )
+        )
+
+    if end_date:
+        conditions.append("forecast_date <= @end_date")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "end_date",
+                "DATE",
+                end_date
+            )
+        )
+
+    query = f"""
+        SELECT
+            forecast_date,
+            store_id,
+            item_id,
+            dept_id,
+            cat_id,
+            model_name,
+            predicted_demand,
+            actual_demand,
+            run_id,
+            created_at
+        FROM {_table_reference(table, dataset)}
+        WHERE {" AND ".join(conditions)}
+        ORDER BY forecast_date
+    """
+
+    return _execute_query(
+        query,
+        parameters
+    )
+
+
+def get_latest_forecast_run() -> Optional[str]:
+    """
+    Return the latest completed forecast run ID.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("MODEL_RUNS_TABLE", "model_runs")
+
+    query = f"""
+        SELECT run_id
+        FROM {_table_reference(table, dataset)}
+        WHERE status = 'completed'
+        ORDER BY created_at DESC
+        LIMIT 1
+    """
+
+    df = _execute_query(query)
+
+    if df.empty:
+        return None
+
+    return str(df.iloc[0]["run_id"])
+
+
+def get_forecast_date_range() -> tuple:
+    """
+    Return minimum and maximum forecast dates.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("FORECAST_TABLE", "forecast_results")
+
+    query = f"""
+        SELECT
+            MIN(forecast_date) AS min_date,
+            MAX(forecast_date) AS max_date
+        FROM {_table_reference(table, dataset)}
+    """
+
+    df = _execute_query(query)
+
+    if df.empty:
+        return None, None
+
+    return (
+        df.iloc[0]["min_date"],
+        df.iloc[0]["max_date"]
+    )
+
+
+def get_daily_sales(
+    store_id: Optional[str] = None,
+    item_id: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    Retrieve historical daily sales for inventory calculations.
+    """
+    dataset = _get_dataset_name("MARTS_DATASET", "retail_demand")
+    table = os.getenv("DAILY_SALES_TABLE", "daily_sales")
+
+    conditions = [
+        "date IS NOT NULL"
+    ]
+
+    parameters = []
+
+    if store_id:
+        conditions.append("store_id = @store_id")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "store_id",
+                "STRING",
+                store_id
+            )
+        )
+
+    if item_id:
+        conditions.append("item_id = @item_id")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "item_id",
+                "STRING",
+                item_id
+            )
+        )
+
+    if start_date:
+        conditions.append("date >= @start_date")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "start_date",
+                "DATE",
+                start_date
+            )
+        )
+
+    if end_date:
+        conditions.append("date <= @end_date")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "end_date",
+                "DATE",
+                end_date
+            )
+        )
+
+    query = f"""
+        SELECT
+            date,
+            store_id,
+            item_id,
+            dept_id,
+            cat_id,
+            state_id,
+            sales,
+            sell_price
+        FROM {_table_reference(table, dataset)}
+        WHERE {" AND ".join(conditions)}
+        ORDER BY date
+    """
+
+    return _execute_query(
+        query,
+        parameters
+    )
+
+
+def get_forecast_metrics(
+    model_name: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    Retrieve model evaluation metrics.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("METRICS_TABLE", "forecast_metrics")
+
+    conditions = []
+
+    parameters = []
+
+    if model_name:
+        conditions.append("model_name = @model_name")
+        parameters.append(
+            bigquery.ScalarQueryParameter(
+                "model_name",
+                "STRING",
+                model_name
+            )
+        )
+
+    where_clause = ""
+
+    if conditions:
+        where_clause = "WHERE " + " AND ".join(conditions)
+
+    query = f"""
+        SELECT
+            model_name,
+            mae,
+            rmse,
+            mape,
+            r2_score,
+            evaluated_at
+        FROM {_table_reference(table, dataset)}
+        {where_clause}
+        ORDER BY mae ASC
+    """
+
+    return _execute_query(
+        query,
+        parameters
+    )
+
+
+def get_model_runs() -> pd.DataFrame:
+    """
+    Retrieve historical model execution records.
+    """
+    dataset = _get_dataset_name("FORECAST_DATASET", "retail_demand")
+    table = os.getenv("MODEL_RUNS_TABLE", "model_runs")
+
+    query = f"""
+        SELECT
+            run_id,
+            model_name,
+            status,
+            created_at,
+            completed_at
+        FROM {_table_reference(table, dataset)}
+        ORDER BY created_at DESC
+    """
+
+    return _execute_query(query)
+
+
