@@ -15,7 +15,7 @@ DEFAULT_SAFETY_STOCK_DAYS = 3
 def validate_inventory_inputs(
     current_stock: float,
     lead_time_days: int,
-    safety_stock_days: int,
+    safety_stock_days: float,
 ) -> None:
     """
     Validate inventory inputs.
@@ -40,7 +40,7 @@ def calculate_inventory_metrics(
     forecast_df: pd.DataFrame,
     current_stock: float,
     lead_time_days: int = DEFAULT_LEAD_TIME_DAYS,
-    safety_stock_days: int = DEFAULT_SAFETY_STOCK_DAYS,
+    safety_stock_days: float = DEFAULT_SAFETY_STOCK_DAYS,
 ) -> dict:
     """
     Calculate inventory metrics from forecast demand.
@@ -142,7 +142,7 @@ def calculate_item_inventory_status(
     forecast_df: pd.DataFrame,
     inventory_df: pd.DataFrame,
     lead_time_days: int = DEFAULT_LEAD_TIME_DAYS,
-    safety_stock_days: int = DEFAULT_SAFETY_STOCK_DAYS,
+    safety_stock_days: float = DEFAULT_SAFETY_STOCK_DAYS,
 ) -> pd.DataFrame:
     """
     Calculate inventory recommendations for every
