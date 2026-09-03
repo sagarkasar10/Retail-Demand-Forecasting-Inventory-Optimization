@@ -1,249 +1,178 @@
-"""
-Demand Forecast dashboard page.
-
-Provides store, department, category, item, model,
-and date filters and displays a 30-day demand forecast.
-"""
-
-from __future__ import annotations
-
-from datetime import date, timedelta
-
-import pandas as pd
 import streamlit as st
+import pandas as pd
 
 from src.dashboard.data_access import (
-    get_available_categories,
+    get_available_stores,
     get_available_departments,
+    get_available_categories,
     get_available_items,
     get_available_models,
-    get_available_stores,
     get_forecast_data,
+    get_forecast_date_range,
 )
+from dashboard.components.charts import render_demand_line_chart
 
 
-def _safe_list(loader) -> list[str]:
-    """
-    Safely load filter options.
-    """
-    try:
-        return loader()
-    except Exception as exc:
-        st.warning(
-            f"Unable to load filter options: {exc}"
-        )
-        return []
-
-
-def _prepare_forecast_chart(
-    forecast_df: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Aggregate forecast demand by date.
-    """
-    if forecast_df.empty:
-        return pd.DataFrame()
-
-    chart_df = (
-        forecast_df
-        .groupby(
-            "forecast_date",
-            as_index=False,
-        )["predicted_demand"]
-        .sum()
-        .sort_values("forecast_date")
-    )
-
-    return chart_df.set_index("forecast_date")
-
-
-def render_forecast() -> None:
-    """
-    Render the demand forecast page.
-    """
+def render_forecast():
     st.title("Demand Forecast")
 
-    st.markdown(
-        """
-        Select a store, product hierarchy, model, and forecast
-        period to analyze expected demand.
-        """
+    st.write(
+        "Explore forecasted product demand by store, department, "
+        "category, item, and forecasting model."
     )
 
-    stores = _safe_list(get_available_stores)
-    departments = _safe_list(
-        get_available_departments
-    )
-    categories = _safe_list(
-        get_available_categories
-    )
-    items = _safe_list(get_available_items)
-    models = _safe_list(get_available_models)
+    try:
+        min_date, max_date = get_forecast_date_range()
 
-    col1, col2, col3 = st.columns(3)
+        if min_date is None or max_date is None:
+            st.warning("No forecast data is currently available.")
+            return
 
-    with col1:
-        store_id = st.selectbox(
-            "Store",
-            ["All"] + stores,
-        )
+        stores = get_available_stores()
+        departments = get_available_departments()
+        categories = get_available_categories()
+        models = get_available_models()
 
-    with col2:
-        dept_id = st.selectbox(
-            "Department",
-            ["All"] + departments,
-        )
+        col1, col2, col3 = st.columns(3)
 
-    with col3:
-        cat_id = st.selectbox(
-            "Category",
-            ["All"] + categories,
-        )
-
-    col4, col5 = st.columns(2)
-
-    with col4:
-        item_id = st.selectbox(
-            "Item",
-            ["All"] + items,
-        )
-
-    with col5:
-        model_name = st.selectbox(
-            "Forecast Model",
-            ["All"] + models,
-        )
-
-    st.subheader("Forecast Period")
-
-    today = date.today()
-
-    start_date = st.date_input(
-        "Start Date",
-        value=today,
-        key="forecast_start_date",
-    )
-
-    end_date = st.date_input(
-        "End Date",
-        value=today + timedelta(days=29),
-        key="forecast_end_date",
-    )
-
-    if start_date > end_date:
-        st.error(
-            "Start date cannot be after end date."
-        )
-        return
-
-    if (end_date - start_date).days > 30:
-        st.warning(
-            "The dashboard is designed for a maximum "
-            "30-day forecast view."
-        )
-
-    if st.button(
-        "Load Forecast",
-        type="primary",
-    ):
-        try:
-            forecast_df = get_forecast_data(
-                store_id=(
-                    None
-                    if store_id == "All"
-                    else store_id
-                ),
-                dept_id=(
-                    None
-                    if dept_id == "All"
-                    else dept_id
-                ),
-                cat_id=(
-                    None
-                    if cat_id == "All"
-                    else cat_id
-                ),
-                item_id=(
-                    None
-                    if item_id == "All"
-                    else item_id
-                ),
-                model_name=(
-                    None
-                    if model_name == "All"
-                    else model_name
-                ),
-                start_date=str(start_date),
-                end_date=str(end_date),
+        with col1:
+            selected_store = st.selectbox(
+                "Store",
+                ["All"] + stores
             )
+
+        with col2:
+            selected_department = st.selectbox(
+                "Department",
+                ["All"] + departments
+            )
+
+        with col3:
+            selected_category = st.selectbox(
+                "Category",
+                ["All"] + categories
+            )
+
+        store_filter = (
+            None if selected_store == "All"
+            else selected_store
+        )
+
+        department_filter = (
+            None if selected_department == "All"
+            else selected_department
+        )
+
+        category_filter = (
+            None if selected_category == "All"
+            else selected_category
+        )
+
+        items = get_available_items(
+            store_id=store_filter,
+            dept_id=department_filter,
+            cat_id=category_filter,
+        )
+
+        col4, col5 = st.columns(2)
+
+        with col4:
+            selected_item = st.selectbox(
+                "Item",
+                ["All"] + items
+            )
+
+        with col5:
+            selected_model = st.selectbox(
+                "Forecast Model",
+                ["All"] + models
+            )
+
+        selected_start, selected_end = st.date_input(
+            "Forecast Date Range",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+        )
+
+        if selected_start > selected_end:
+            st.error("Start date cannot be after end date.")
+            return
+
+        item_filter = (
+            None if selected_item == "All"
+            else selected_item
+        )
+
+        model_filter = (
+            None if selected_model == "All"
+            else selected_model
+        )
+
+        if st.button(
+            "Load Forecast",
+            type="primary",
+            use_container_width=True
+        ):
+            with st.spinner("Loading forecast data..."):
+                forecast_df = get_forecast_data(
+                    store_id=store_filter,
+                    dept_id=department_filter,
+                    cat_id=category_filter,
+                    item_id=item_filter,
+                    model_name=model_filter,
+                    start_date=str(selected_start),
+                    end_date=str(selected_end),
+                )
 
             if forecast_df.empty:
                 st.warning(
-                    "No forecast data found for the selected filters."
+                    "No forecast records found for the selected filters."
                 )
                 return
 
-            total_demand = (
-                forecast_df["predicted_demand"]
-                .sum()
+            forecast_df["forecast_date"] = pd.to_datetime(
+                forecast_df["forecast_date"]
             )
 
-            average_daily_demand = (
-                forecast_df
-                .groupby("forecast_date")
-                ["predicted_demand"]
-                .sum()
-                .mean()
+            total_demand = forecast_df[
+                "predicted_demand"
+            ].sum()
+
+            average_daily_demand = forecast_df[
+                "predicted_demand"
+            ].mean()
+
+            forecast_days = forecast_df[
+                "forecast_date"
+            ].nunique()
+
+            st.subheader("Forecast Summary")
+
+            kpi1, kpi2, kpi3 = st.columns(3)
+
+            kpi1.metric(
+                "Total Forecast Demand",
+                f"{total_demand:,.0f}"
             )
 
-            peak_day = (
-                forecast_df
-                .groupby("forecast_date")
-                ["predicted_demand"]
-                .sum()
-                .idxmax()
+            kpi2.metric(
+                "Average Daily Demand",
+                f"{average_daily_demand:,.2f}"
             )
 
-            peak_demand = (
-                forecast_df
-                .groupby("forecast_date")
-                ["predicted_demand"]
-                .sum()
-                .max()
+            kpi3.metric(
+                "Forecast Days",
+                f"{forecast_days:,}"
             )
 
-            metric_col1, metric_col2, metric_col3 = (
-                st.columns(3)
-            )
+            st.divider()
 
-            with metric_col1:
-                st.metric(
-                    "Total Forecast Demand",
-                    f"{total_demand:,.0f}",
-                )
-
-            with metric_col2:
-                st.metric(
-                    "Average Daily Demand",
-                    f"{average_daily_demand:,.0f}",
-                )
-
-            with metric_col3:
-                st.metric(
-                    "Peak Demand",
-                    f"{peak_demand:,.0f}",
-                    help=f"Peak date: {peak_day}",
-                )
-
-            st.subheader("30-Day Demand Forecast")
-
-            chart_df = _prepare_forecast_chart(
-                forecast_df
-            )
-
-            st.line_chart(
-                chart_df["predicted_demand"],
-                use_container_width=True,
+            render_demand_line_chart(
+                forecast_df,
+                date_column="forecast_date",
+                value_column="predicted_demand",
+                title="Predicted Daily Demand",
             )
 
             st.subheader("Forecast Details")
@@ -256,7 +185,6 @@ def render_forecast() -> None:
                 "cat_id",
                 "model_name",
                 "predicted_demand",
-                "actual_demand",
             ]
 
             available_columns = [
@@ -271,8 +199,22 @@ def render_forecast() -> None:
                 hide_index=True,
             )
 
-        except Exception as exc:
-            st.error(
-                "Unable to load demand forecast."
+            csv_data = forecast_df.to_csv(
+                index=False
+            ).encode("utf-8")
+
+            st.download_button(
+                "Download Forecast CSV",
+                data=csv_data,
+                file_name="demand_forecast.csv",
+                mime="text/csv",
+                use_container_width=True,
             )
+
+    except Exception as exc:
+        st.error(
+            "Unable to load forecast information."
+        )
+
+        with st.expander("Technical details"):
             st.exception(exc)

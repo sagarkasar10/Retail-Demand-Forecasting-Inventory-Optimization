@@ -1,13 +1,10 @@
-"""
-Main Streamlit application.
-"""
-
 import streamlit as st
 
 from dashboard.pages.forecast import render_forecast
 from dashboard.pages.inventory import render_inventory
 from dashboard.pages.overview import render_overview
 from dashboard.pages.scenarios import render_scenarios
+from dashboard.pages.model_performance import render_model_performance
 
 
 st.set_page_config(
@@ -18,30 +15,11 @@ st.set_page_config(
 )
 
 
-def render_model_performance() -> None:
-    """
-    Temporary model-performance page.
-    """
-    st.title("Model Performance")
-
-    st.info(
-        "Model performance visualization will be implemented "
-        "in the next dashboard iteration."
-    )
-
-
-def render_sidebar() -> str:
-    """
-    Render the application sidebar.
-    """
+def main():
     st.sidebar.title("Retail Analytics")
 
-    st.sidebar.markdown(
-        """
-        **Retail Demand Forecasting & Inventory Optimization**
-
-        Monitor demand, forecasts, inventory and scenarios.
-        """
+    st.sidebar.caption(
+        "Demand Forecasting & Inventory Optimization"
     )
 
     page = st.sidebar.radio(
@@ -54,21 +32,6 @@ def render_sidebar() -> str:
             "Model Performance",
         ],
     )
-
-    st.sidebar.divider()
-
-    st.sidebar.caption(
-        "Powered by BigQuery + Streamlit"
-    )
-
-    return page
-
-
-def main() -> None:
-    """
-    Main dashboard execution flow.
-    """
-    page = render_sidebar()                                                               
 
     if page == "Overview":
         render_overview()
