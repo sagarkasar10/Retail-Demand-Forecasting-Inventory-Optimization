@@ -4,7 +4,9 @@ from dashboard.pages.forecast import render_forecast
 from dashboard.pages.inventory import render_inventory
 from dashboard.pages.overview import render_overview
 from dashboard.pages.scenarios import render_scenarios
-from dashboard.pages.model_performance import render_model_performance
+from dashboard.pages.model_performance import (
+    render_model_performance
+)
 
 
 st.set_page_config(
@@ -16,7 +18,9 @@ st.set_page_config(
 
 
 def main():
-    st.sidebar.title("Retail Analytics")
+    st.sidebar.title(
+        "Retail Analytics"
+    )
 
     st.sidebar.caption(
         "Demand Forecasting & Inventory Optimization"
