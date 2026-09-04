@@ -1,3 +1,5 @@
+import math
+
 import streamlit as st
 
 from src.dashboard.data_access import (
@@ -9,6 +11,7 @@ from src.dashboard.data_access import (
 from src.dashboard.inventory_service import (
     calculate_inventory_metrics,
     calculate_item_inventory_status,
+    calculate_inventory_alert,
 )
 
 
@@ -16,20 +19,23 @@ def render_inventory():
     st.title("Inventory Optimization")
 
     st.write(
-        "Estimate reorder requirements and projected inventory "
-        "levels using forecasted demand."
+        "Estimate reorder requirements, stockout risk, "
+        "and projected inventory levels."
     )
 
     try:
         stores = get_available_stores()
 
         if not stores:
-            st.warning("No stores are available.")
+            st.warning(
+                "No stores are available."
+            )
             return
 
         selected_store = st.selectbox(
             "Store",
-            stores
+            stores,
+            key="inventory_store"
         )
 
         items = get_available_items(
@@ -44,7 +50,8 @@ def render_inventory():
 
         selected_item = st.selectbox(
             "Item",
-            items
+            items,
+            key="inventory_item"
         )
 
         col1, col2, col3 = st.columns(3)
@@ -80,7 +87,9 @@ def render_inventory():
         ):
             return
 
-        with st.spinner("Calculating inventory requirements..."):
+        with st.spinner(
+            "Loading forecast data..."
+        ):
             forecast_df = get_forecast_data(
                 store_id=selected_store,
                 item_id=selected_item,
@@ -88,7 +97,7 @@ def render_inventory():
 
         if forecast_df.empty:
             st.warning(
-                "No forecast data found for the selected item."
+                "No forecast data found."
             )
             return
 
@@ -99,7 +108,13 @@ def render_inventory():
             safety_stock_days=safety_stock_days,
         )
 
-        st.subheader("Inventory KPIs")
+        alert = calculate_inventory_alert(
+            metrics
+        )
+
+        st.subheader(
+            "Inventory KPIs"
+        )
 
         col1, col2, col3, col4 = st.columns(4)
 
@@ -123,39 +138,83 @@ def render_inventory():
             f"{metrics['recommended_order_quantity']:,.0f}"
         )
 
-        if metrics["stockout_risk"]:
+        if alert == "CRITICAL":
             st.error(
-                "High stockout risk: current stock is below "
-                "the calculated reorder point."
-            )
-        else:
-            st.success(
-                "Current stock is above the calculated "
-                "reorder point."
+                "CRITICAL: Current stock is zero."
             )
 
-        inventory_projection = calculate_item_inventory_status(
+        elif alert == "HIGH":
+            st.error(
+                "HIGH RISK: Current stock is below "
+                "the reorder point."
+            )
+
+        elif alert == "MEDIUM":
+            st.warning(
+                "MEDIUM RISK: Inventory coverage "
+                "should be monitored."
+            )
+
+        else:
+            st.success(
+                "LOW RISK: Current inventory is "
+                "above the reorder point."
+            )
+
+        projection = calculate_item_inventory_status(
             forecast_df,
             metrics,
         )
 
-        st.subheader("Projected Inventory")
-
-        st.line_chart(
-            inventory_projection.set_index(
-                "forecast_date"
-            )["projected_stock"]
+        st.subheader(
+            "Projected Inventory"
         )
 
-        st.subheader("Daily Inventory Projection")
+        chart_df = projection.set_index(
+            "forecast_date"
+        )[
+            [
+                "projected_stock",
+            ]
+        ]
+
+        st.line_chart(
+            chart_df
+        )
+
+        stockout_rows = projection[
+            projection["stockout"]
+        ]
+
+        if not stockout_rows.empty:
+            first_stockout_date = (
+                stockout_rows.iloc[0][
+                    "forecast_date"
+                ]
+            )
+
+            st.warning(
+                "Projected stockout date: "
+                f"{first_stockout_date.date()}"
+            )
+
+        else:
+            st.success(
+                "No stockout is projected within "
+                "the selected forecast horizon."
+            )
+
+        st.subheader(
+            "Inventory Details"
+        )
 
         st.dataframe(
-            inventory_projection,
+            projection,
             use_container_width=True,
             hide_index=True,
         )
 
-        csv_data = inventory_projection.to_csv(
+        csv_data = projection.to_csv(
             index=False
         ).encode("utf-8")
 
@@ -175,5 +234,7 @@ def render_inventory():
             "Unable to calculate inventory requirements."
         )
 
-        with st.expander("Technical details"):
+        with st.expander(
+            "Technical details"
+        ):
             st.exception(exc)
