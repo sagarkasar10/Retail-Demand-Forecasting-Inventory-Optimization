@@ -9,9 +9,7 @@ Streamlit application.
 
 from dashboard.pages.forecast import render_forecast
 from dashboard.pages.inventory import render_inventory
-from dashboard.pages.model_performance import (
-    render_model_performance,
-)
+from dashboard.pages.model_performance import render_model_performance
 from dashboard.pages.overview import render_overview
 from dashboard.pages.scenarios import render_scenarios
 
