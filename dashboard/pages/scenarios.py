@@ -94,12 +94,13 @@ def render_scenarios():
             )
 
             summary = summarize_scenario(
-                scenario_df
+                scenario_df,
+                price_change_percent=price_change,
             )
 
             st.subheader("Scenario Impact")
 
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
 
             col1.metric(
                 "Base Demand",
@@ -114,6 +115,11 @@ def render_scenarios():
             col3.metric(
                 "Demand Difference",
                 f"{summary['demand_difference']:,.0f}",
+            )
+
+            col4.metric(
+                "Revenue Change",
+                f"{summary['revenue_difference_percent']:.2f}%",
             )
 
             if summary["demand_difference"] > 0:

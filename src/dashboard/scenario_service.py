@@ -161,20 +161,113 @@ def estimate_price_elasticity_scenario(
     }
 
 
-def summarize_scenario(
-    scenario_df: pd.DataFrame
+def estimate_revenue_impact(
+    scenario_df: pd.DataFrame,
+    price_change_percent: float,
 ) -> Dict[str, float]:
     """
-    Create summary metrics from scenario output.
+    Estimate revenue before and after the scenario.
+
+    Revenue is calculated using a normalized base price of 1.
+    This provides a relative revenue comparison when the
+    actual price is not available in the forecast table.
     """
+
+    if scenario_df.empty:
+        return {
+            "base_revenue_index": 0.0,
+            "scenario_revenue_index": 0.0,
+            "revenue_difference_percent": 0.0,
+        }
+
+    base_demand = float(
+        scenario_df["base_demand"].sum()
+    )
+
+    scenario_demand = float(
+        scenario_df["scenario_demand"].sum()
+    )
+
+    price_multiplier = (
+        1 +
+        price_change_percent / 100
+    )
+
+    base_revenue = base_demand
+
+    scenario_revenue = (
+        scenario_demand *
+        price_multiplier
+    )
+
+    revenue_difference_percent = (
+        0.0
+        if base_revenue == 0
+        else (
+            (
+                scenario_revenue -
+                base_revenue
+            )
+            /
+            base_revenue
+            *
+            100
+        )
+    )
+
     return {
-        "base_demand": float(
-            scenario_df["base_demand"].sum()
+        "base_revenue_index": base_revenue,
+        "scenario_revenue_index": scenario_revenue,
+        "revenue_difference_percent": (
+            revenue_difference_percent
         ),
-        "scenario_demand": float(
-            scenario_df["scenario_demand"].sum()
+    }
+
+
+def summarize_scenario(
+    scenario_df: pd.DataFrame,
+    price_change_percent: float = 0.0,
+) -> Dict[str, float]:
+    """Create scenario summary metrics."""
+
+    base_demand = float(
+        scenario_df["base_demand"].sum()
+    )
+
+    scenario_demand = float(
+        scenario_df["scenario_demand"].sum()
+    )
+
+    demand_difference = (
+        scenario_demand -
+        base_demand
+    )
+
+    revenue = estimate_revenue_impact(
+        scenario_df,
+        price_change_percent,
+    )
+
+    return {
+        "base_demand": base_demand,
+        "scenario_demand": scenario_demand,
+        "demand_difference": demand_difference,
+        "demand_change_percent": (
+            0.0
+            if base_demand == 0
+            else (
+                demand_difference /
+                base_demand *
+                100
+            )
         ),
-        "demand_difference": float(
-            scenario_df["demand_difference"].sum()
-        ),
+        "base_revenue_index": revenue[
+            "base_revenue_index"
+        ],
+        "scenario_revenue_index": revenue[
+            "scenario_revenue_index"
+        ],
+        "revenue_difference_percent": revenue[
+            "revenue_difference_percent"
+        ],
     }
