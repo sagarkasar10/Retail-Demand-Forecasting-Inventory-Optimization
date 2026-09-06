@@ -6,13 +6,17 @@ from src.dashboard.data_access import (
     get_model_runs,
 )
 
+from dashboard.components.charts import (
+    render_model_error_chart,
+)
+
 
 def render_model_performance():
     st.title("Model Performance")
 
     st.write(
-        "Compare forecasting models using historical "
-        "evaluation metrics and model execution records."
+        "Compare forecasting models using accuracy metrics "
+        "and model execution history."
     )
 
     try:
@@ -27,6 +31,7 @@ def render_model_performance():
         selected_model = st.selectbox(
             "Model",
             ["All"] + models,
+            key="performance_model"
         )
 
         model_filter = (
@@ -48,49 +53,66 @@ def render_model_performance():
                 "Forecast Accuracy Metrics"
             )
 
+            metric_columns = [
+                "model_name",
+                "mae",
+                "rmse",
+                "mape",
+                "r2_score",
+                "evaluated_at",
+            ]
+
+            available_columns = [
+                column
+                for column in metric_columns
+                if column in metrics_df.columns
+            ]
+
             st.dataframe(
-                metrics_df,
+                metrics_df[available_columns],
                 use_container_width=True,
                 hide_index=True,
             )
 
             if "mae" in metrics_df.columns:
-                best_mae = metrics_df.loc[
-                    metrics_df["mae"].idxmin()
-                ]
-
-                st.metric(
-                    "Best Model by MAE",
-                    str(best_mae["model_name"]),
-                    f"MAE: {best_mae['mae']:.4f}",
+                valid_mae = metrics_df.dropna(
+                    subset=["mae"]
                 )
+
+                if not valid_mae.empty:
+                    best_mae = valid_mae.loc[
+                        valid_mae["mae"].idxmin()
+                    ]
+
+                    st.metric(
+                        "Best Model by MAE",
+                        str(
+                            best_mae["model_name"]
+                        ),
+                        f"MAE: {best_mae['mae']:.4f}",
+                    )
 
             if "rmse" in metrics_df.columns:
-                best_rmse = metrics_df.loc[
-                    metrics_df["rmse"].idxmin()
-                ]
-
-                st.metric(
-                    "Best Model by RMSE",
-                    str(best_rmse["model_name"]),
-                    f"RMSE: {best_rmse['rmse']:.4f}",
+                valid_rmse = metrics_df.dropna(
+                    subset=["rmse"]
                 )
 
-            if "model_name" in metrics_df.columns:
-                chart_df = (
-                    metrics_df[
-                        ["model_name", "mae", "rmse"]
+                if not valid_rmse.empty:
+                    best_rmse = valid_rmse.loc[
+                        valid_rmse["rmse"].idxmin()
                     ]
-                    .set_index("model_name")
-                )
 
-                st.subheader(
-                    "Model Error Comparison"
-                )
+                    st.metric(
+                        "Best Model by RMSE",
+                        str(
+                            best_rmse["model_name"]
+                        ),
+                        f"RMSE: {best_rmse['rmse']:.4f}",
+                    )
 
-                st.bar_chart(
-                    chart_df
-                )
+            render_model_error_chart(
+                metrics_df
+            )
 
         st.divider()
 
@@ -104,23 +126,55 @@ def render_model_performance():
             st.info(
                 "No model execution records are available."
             )
-        else:
-            if model_filter:
-                runs_df = runs_df[
-                    runs_df["model_name"].astype(str)
-                    == model_filter
-                ]
+            return
 
-            st.dataframe(
-                runs_df,
-                use_container_width=True,
-                hide_index=True,
+        if model_filter:
+            runs_df = runs_df[
+                runs_df["model_name"].astype(str)
+                == model_filter
+            ]
+
+        if runs_df.empty:
+            st.info(
+                "No execution records found for "
+                "the selected model."
             )
+            return
+
+        st.dataframe(
+            runs_df,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        completed_runs = runs_df[
+            runs_df["status"].astype(str).str.lower()
+            == "completed"
+        ]
+
+        failed_runs = runs_df[
+            runs_df["status"].astype(str).str.lower()
+            == "failed"
+        ]
+
+        col1, col2 = st.columns(2)
+
+        col1.metric(
+            "Completed Runs",
+            len(completed_runs)
+        )
+
+        col2.metric(
+            "Failed Runs",
+            len(failed_runs)
+        )
 
     except Exception as exc:
         st.error(
             "Unable to load model performance information."
         )
 
-        with st.expander("Technical details"):
+        with st.expander(
+            "Technical details"
+        ):
             st.exception(exc)

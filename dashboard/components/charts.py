@@ -197,3 +197,68 @@ def render_top_items_chart(
     st.bar_chart(
         chart_df[demand_column]
     )
+def render_model_error_chart(
+    metrics_df: pd.DataFrame,
+):
+    """Render model MAE and RMSE comparison."""
+
+    if metrics_df.empty:
+        st.info(
+            "No model metrics available."
+        )
+        return
+
+    required_columns = {
+        "model_name",
+        "mae",
+        "rmse",
+    }
+
+    missing_columns = (
+        required_columns -
+        set(metrics_df.columns)
+    )
+
+    if missing_columns:
+        st.error(
+            f"Missing model metric columns: {missing_columns}"
+        )
+        return
+
+    chart_df = metrics_df[
+        [
+            "model_name",
+            "mae",
+            "rmse",
+        ]
+    ].copy()
+
+    chart_df["mae"] = pd.to_numeric(
+        chart_df["mae"],
+        errors="coerce"
+    )
+
+    chart_df["rmse"] = pd.to_numeric(
+        chart_df["rmse"],
+        errors="coerce"
+    )
+
+    chart_df = (
+        chart_df
+        .dropna()
+        .drop_duplicates("model_name")
+        .set_index("model_name")
+    )
+
+    st.subheader(
+        "Model Error Comparison"
+    )
+
+    st.bar_chart(
+        chart_df[
+            [
+                "mae",
+                "rmse",
+            ]
+        ]
+    )
