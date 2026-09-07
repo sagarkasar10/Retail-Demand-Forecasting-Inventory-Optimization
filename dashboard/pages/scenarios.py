@@ -257,16 +257,50 @@ def render_inventory_impact(
     return inventory_metrics
 
 
-def render_scenarios():
-    st.title(
-        "What-if Scenario Analysis"
+def render_scenario_report(
+    scenario_df,
+    inventory_metrics,
+    scenario_type,
+):
+    st.divider()
+
+    st.subheader("Scenario Report")
+
+    report_summary = generate_scenario_summary(
+        scenario_df=scenario_df,
+        inventory_metrics=inventory_metrics,
+        scenario_type=scenario_type,
     )
 
-    st.write(
-        "Simulate price changes and promotional demand "
-        "uplift to understand their impact on demand, "
-        "revenue, and inventory."
+    report_df = create_scenario_report_dataframe(
+        report_summary
     )
+
+    st.dataframe(
+        report_df,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    csv_data = report_df.to_csv(
+        index=False
+    ).encode("utf-8")
+
+    filename = create_scenario_filename(
+        scenario_type
+    )
+
+    st.download_button(
+        label="Download Scenario Report",
+        data=csv_data,
+        file_name=filename,
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+
+def render_scenarios():
+    st.title("What-if Scenario Analysis")
 
     try:
         stores = get_available_stores()
@@ -280,7 +314,6 @@ def render_scenarios():
         selected_store = st.selectbox(
             "Select Store",
             stores,
-            key="scenario_store",
         )
 
         items = get_available_items(
@@ -296,7 +329,6 @@ def render_scenarios():
         selected_item = st.selectbox(
             "Select Item",
             items,
-            key="scenario_item",
         )
 
         with st.spinner(
@@ -316,18 +348,13 @@ def render_scenarios():
 
         if forecast_df.empty:
             st.warning(
-                "No forecast data is available for "
-                "the selected item."
+                "No forecast data is available."
             )
             return
 
         base_price = get_latest_product_price(
             historical_sales_df,
             default_price=1.0,
-        )
-
-        st.caption(
-            f"Current reference price: {base_price:,.2f}"
         )
 
         scenario_type = st.radio(
@@ -344,38 +371,21 @@ def render_scenarios():
                 forecast_df,
                 base_price,
             )
-
         else:
             scenario_df = render_promotion_scenario(
                 forecast_df
             )
 
-        st.divider()
-
-        render_inventory_impact(
-            scenario_df
+        inventory_metrics = (
+            render_inventory_impact(
+                scenario_df
+            )
         )
 
-        st.subheader(
-            "Scenario Data"
-        )
-
-        st.dataframe(
-            scenario_df,
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        csv_data = scenario_df.to_csv(
-            index=False
-        ).encode("utf-8")
-
-        st.download_button(
-            "Download Scenario Results",
-            data=csv_data,
-            file_name="scenario_results.csv",
-            mime="text/csv",
-            use_container_width=True,
+        render_scenario_report(
+            scenario_df=scenario_df,
+            inventory_metrics=inventory_metrics,
+            scenario_type=scenario_type,
         )
 
     except ValueError as exc:
@@ -390,3 +400,7 @@ def render_scenarios():
             "Technical Details"
         ):
             st.exception(exc)
+
+
+if _name_ == "_main_":
+    render_scenarios()
