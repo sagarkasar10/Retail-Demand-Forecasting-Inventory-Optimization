@@ -1,14 +1,18 @@
-<<<<<<< HEAD
 version: 2
 
 models:
 
   - name: stg_sales
+    description: >
+      Standardized representation of the Week 1 raw M5
+      sales table.
 
-    description: "Staging model for M5 historical sales data."
+    meta:
+      layer: "staging"
+      source: "retail_demand.raw_sales"
+      grain: "One row per item-store with daily sales columns"
 
     columns:
-
       - name: id
         tests:
           - not_null
@@ -35,11 +39,16 @@ models:
 
 
   - name: stg_calendar
+    description: >
+      Standardized M5 calendar containing dates, weeks,
+      events and SNAP information.
 
-    description: "Staging model for M5 calendar data."
+    meta:
+      layer: "staging"
+      source: "retail_demand.raw_calendar"
+      grain: "One row per calendar date"
 
     columns:
-
       - name: date
         tests:
           - not_null
@@ -51,11 +60,15 @@ models:
 
 
   - name: stg_prices
+    description: >
+      Standardized M5 weekly item-store pricing data.
 
-    description: "Staging model for M5 pricing data."
+    meta:
+      layer: "staging"
+      source: "retail_demand.raw_prices"
+      grain: "One row per item-store-week"
 
     columns:
-
       - name: store_id
         tests:
           - not_null
@@ -71,35 +84,3 @@ models:
       - name: sell_price
         tests:
           - not_null
-=======
-models:
-
-  - name: stg_sales
-    description: >
-      Standardized representation of the Week 1 raw M5
-      sales table.
-
-    meta:
-      layer: "staging"
-      source: "retail_demand.raw_sales"
-      grain: "One row per item-store with daily sales columns"
-
-  - name: stg_calendar
-    description: >
-      Standardized M5 calendar containing dates, weeks,
-      events and SNAP information.
-
-    meta:
-      layer: "staging"
-      source: "retail_demand.raw_calendar"
-      grain: "One row per calendar date"
-
-  - name: stg_prices
-    description: >
-      Standardized M5 weekly item-store pricing data.
-
-    meta:
-      layer: "staging"
-      source: "retail_demand.raw_prices"
-      grain: "One row per item-store-week"
->>>>>>> shelly_mittal
