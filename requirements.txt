@@ -5,3 +5,8 @@ python-dotenv
 pyarrow
 pytest
 db-dtypes
+streamlit
+prophet
+lightgbm
+scikit-learn
+plotly
