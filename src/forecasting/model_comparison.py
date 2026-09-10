@@ -34,6 +34,15 @@ def compare_prophet_and_lightgbm(
 ) -> pd.DataFrame:
     """Compare Prophet and LightGBM performance."""
 
+    if (
+        len(actual) != len(prophet_predictions)
+        or len(actual) != len(lightgbm_predictions)
+    ):
+        raise ValueError(
+            "Actual values, Prophet predictions, and "
+            "LightGBM predictions must have the same length."
+        )
+
     prophet_metrics = evaluate_model_predictions(
         actual=actual,
         predicted=prophet_predictions,

@@ -181,27 +181,27 @@ def evaluate_forecast(
     )
 
     return {
-    "mae": calculate_mae(
-        actual_array,
-        predicted_array,
-    ),
-    "rmse": calculate_rmse(
-        actual_array,
-        predicted_array,
-    ),
-    "mape": calculate_mape(
-        actual_array,
-        predicted_array,
-    ),
-    "wape": calculate_wape(
-        actual_array,
-        predicted_array,
-    ),
-     "bias": calculate_bias(
-        actual_array,
-        predicted_array,
-    ),
-}
+        "mae": calculate_mae(
+            actual_array,
+            predicted_array,
+        ),
+        "rmse": calculate_rmse(
+            actual_array,
+            predicted_array,
+        ),
+        "mape": calculate_mape(
+            actual_array,
+            predicted_array,
+        ),
+        "wape": calculate_wape(
+            actual_array,
+            predicted_array,
+        ),
+        "bias": calculate_bias(
+            actual_array,
+            predicted_array,
+        ),
+    }
 
 
 def evaluate_forecast_dataframe(
@@ -252,6 +252,7 @@ def evaluate_forecast_dataframe(
     )
 
     return metrics
+
 
 def create_evaluation_dataframe(
     actual,

@@ -696,8 +696,8 @@ def train_and_forecast_prophet(
         periods=periods,
     )
 
-python
-from __future__ import annotations
+
+
 
 from typing import Optional
 
