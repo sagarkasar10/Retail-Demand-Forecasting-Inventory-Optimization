@@ -164,9 +164,37 @@ def get_available_categories() -> list[str]:
     return df["cat_id"].astype(str).tolist()
 
 
-@lru_cache(maxsize=1)
-def get_available_items() -> list[str]:
-    """Return available item IDs."""
+@lru_cache(maxsize=128)
+def get_available_items(
+    store_id: Optional[str] = None,
+    dept_id: Optional[str] = None,
+    cat_id: Optional[str] = None,
+) -> list[str]:
+    """Return available item IDs, optionally filtered by
+    store, department, and/or category."""
+
+    conditions = ["item_id IS NOT NULL"]
+    parameters = []
+
+    filters = {
+        "store_id": store_id,
+        "dept_id": dept_id,
+        "cat_id": cat_id,
+    }
+
+    for field, value in filters.items():
+        if value:
+            conditions.append(
+                f"CAST({field} AS STRING) = @{field}"
+            )
+
+            parameters.append(
+                bigquery.ScalarQueryParameter(
+                    field,
+                    "STRING",
+                    str(value)
+                )
+            )
 
     query = f"""
         SELECT DISTINCT
@@ -175,11 +203,11 @@ def get_available_items() -> list[str]:
             DAILY_SALES_TABLE,
             MARTS_DATASET
         )}
-        WHERE item_id IS NOT NULL
+        WHERE {" AND ".join(conditions)}
         ORDER BY item_id
     """
 
-    df = _execute_query(query)
+    df = _execute_query(query, parameters)
 
     return df["item_id"].astype(str).tolist()
 
