@@ -81,8 +81,8 @@ from src.forecasting.week3_pipeline import (
 
 from src.forecasting.model_comparison import (
     evaluate_model_predictions,
-    compare_model_metrics,
-    select_best_model,
+    compare_prophet_and_lightgbm,
+    get_best_forecasting_model,
 )
 
 
@@ -401,7 +401,7 @@ logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     main()
-    run_week3_pipeline()
+   
     
     
     
