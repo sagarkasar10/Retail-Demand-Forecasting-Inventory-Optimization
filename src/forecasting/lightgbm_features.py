@@ -13,11 +13,7 @@ DEFAULT_ROLLING_WINDOWS = [7, 14, 28]
 
 
 def validate_lightgbm_input(dataframe: pd.DataFrame) -> None:
-<<<<<<< HEAD
-    """Validate the base dataset required for LightGBM."""
-=======
     """Validate the base dataset required for LightGBM features."""
->>>>>>> shelly_mittal
 
     missing_columns = set(BASE_COLUMNS) - set(dataframe.columns)
 
@@ -27,7 +23,6 @@ def validate_lightgbm_input(dataframe: pd.DataFrame) -> None:
         )
 
     if dataframe.empty:
-<<<<<<< HEAD
         raise ValueError(
             "LightGBM input dataframe cannot be empty."
         )
@@ -46,28 +41,12 @@ def validate_lightgbm_input(dataframe: pd.DataFrame) -> None:
         raise ValueError(
             "LightGBM input contains negative sales."
         )
-=======
-        raise ValueError("LightGBM input dataframe cannot be empty.")
-
-    if dataframe["date"].isna().any():
-        raise ValueError("LightGBM input contains invalid dates.")
-
-    if dataframe["sales"].isna().any():
-        raise ValueError("LightGBM input contains null sales values.")
-
-    if (dataframe["sales"] < 0).any():
-        raise ValueError("LightGBM input contains negative sales values.")
->>>>>>> shelly_mittal
 
 
 def create_calendar_features(
     dataframe: pd.DataFrame,
 ) -> pd.DataFrame:
-<<<<<<< HEAD
-    """Create calendar features."""
-=======
     """Create calendar-based forecasting features."""
->>>>>>> shelly_mittal
 
     validate_lightgbm_input(dataframe)
 
@@ -78,7 +57,6 @@ def create_calendar_features(
         errors="coerce",
     )
 
-<<<<<<< HEAD
     if df["date"].isna().any():
         raise ValueError(
             "Invalid dates found in LightGBM input."
@@ -86,44 +64,24 @@ def create_calendar_features(
 
     df["day_of_week"] = df["date"].dt.dayofweek
     df["day_of_month"] = df["date"].dt.day
-=======
-    df["day_of_week"] = df["date"].dt.dayofweek
-    df["day_of_month"] = df["date"].dt.day
-    df["day_of_year"] = df["date"].dt.dayofyear
->>>>>>> shelly_mittal
     df["week_of_year"] = (
         df["date"].dt.isocalendar().week.astype(int)
     )
     df["month_number"] = df["date"].dt.month
-<<<<<<< HEAD
-    df["year_number"] = df["date"].dt.year
-=======
     df["quarter"] = df["date"].dt.quarter
     df["year_number"] = df["date"].dt.year
     df["is_weekend"] = (
         df["day_of_week"] >= 5
     ).astype(int)
->>>>>>> shelly_mittal
 
     return df
 
 
 def create_lag_features(
     dataframe: pd.DataFrame,
-<<<<<<< HEAD
-    lags=None,
-) -> pd.DataFrame:
-    """
-    Create historical sales lag features.
-
-    Lag values are calculated independently for each
-    item-store combination.
-    """
-=======
     lags: list[int] | None = None,
 ) -> pd.DataFrame:
     """Create historical sales lag features."""
->>>>>>> shelly_mittal
 
     validate_lightgbm_input(dataframe)
 
@@ -158,22 +116,13 @@ def create_lag_features(
 
 def create_rolling_features(
     dataframe: pd.DataFrame,
-<<<<<<< HEAD
-    windows=None,
-=======
     windows: list[int] | None = None,
->>>>>>> shelly_mittal
 ) -> pd.DataFrame:
     """
     Create leakage-safe rolling demand features.
 
-<<<<<<< HEAD
     The shift(1) ensures that the current day's sales
     are not used to calculate the current day's features.
-=======
-    The one-day shift prevents the current day's sales
-    from being included in its own rolling statistics.
->>>>>>> shelly_mittal
     """
 
     validate_lightgbm_input(dataframe)
@@ -191,37 +140,17 @@ def create_rolling_features(
         ["item_id", "store_id", "date"]
     ).reset_index(drop=True)
 
-<<<<<<< HEAD
-=======
     grouped = df.groupby(
         ["item_id", "store_id"],
         sort=False,
     )["sales"]
 
->>>>>>> shelly_mittal
     for window in windows:
         if window <= 0:
             raise ValueError(
                 "Rolling window values must be greater than zero."
             )
 
-<<<<<<< HEAD
-        df[f"rolling_mean_{window}"] = (
-            df.groupby(
-                ["item_id", "store_id"],
-                sort=False,
-            )["sales"]
-            .transform(
-                lambda series: (
-                    series
-                    .shift(1)
-                    .rolling(
-                        window=window,
-                        min_periods=window,
-                    )
-                    .mean()
-                )
-=======
         shifted = grouped.shift(1)
 
         df[f"rolling_mean_{window}"] = (
@@ -257,7 +186,6 @@ def create_rolling_features(
             .reset_index(
                 level=[0, 1],
                 drop=True,
->>>>>>> shelly_mittal
             )
         )
 
@@ -267,14 +195,10 @@ def create_rolling_features(
 def create_price_features(
     dataframe: pd.DataFrame,
 ) -> pd.DataFrame:
-<<<<<<< HEAD
     """
     Create price-related features when sell_price
     is available.
     """
-=======
-    """Create price and price-change features."""
->>>>>>> shelly_mittal
 
     df = dataframe.copy()
 
@@ -290,13 +214,6 @@ def create_price_features(
         ["item_id", "store_id", "date"]
     ).reset_index(drop=True)
 
-<<<<<<< HEAD
-    df["price_change"] = (
-        df.groupby(
-            ["item_id", "store_id"],
-            sort=False,
-        )["sell_price"]
-=======
     grouped_price = df.groupby(
         ["item_id", "store_id"],
         sort=False,
@@ -304,7 +221,6 @@ def create_price_features(
 
     df["price_change"] = (
         grouped_price
->>>>>>> shelly_mittal
         .pct_change()
         .replace(
             [float("inf"), float("-inf")],
@@ -313,8 +229,6 @@ def create_price_features(
         .fillna(0)
     )
 
-<<<<<<< HEAD
-=======
     df["price_change_7d"] = (
         grouped_price
         .pct_change(periods=7)
@@ -325,21 +239,16 @@ def create_price_features(
         .fillna(0)
     )
 
->>>>>>> shelly_mittal
     return df
 
 
 def create_event_features(
     dataframe: pd.DataFrame,
 ) -> pd.DataFrame:
-<<<<<<< HEAD
     """
     Create numeric event features when event columns
     are available.
     """
-=======
-    """Create event and promotion-related numeric features."""
->>>>>>> shelly_mittal
 
     df = dataframe.copy()
 
@@ -352,11 +261,8 @@ def create_event_features(
             .ne("")
             .astype(int)
         )
-<<<<<<< HEAD
-=======
     else:
         df["has_event"] = 0
->>>>>>> shelly_mittal
 
     if "event_type" in df.columns:
         df["has_event_type"] = (
@@ -367,8 +273,6 @@ def create_event_features(
             .ne("")
             .astype(int)
         )
-<<<<<<< HEAD
-=======
     else:
         df["has_event_type"] = 0
 
@@ -397,7 +301,6 @@ def create_hierarchy_features(
                 .astype("category")
                 .cat.codes
             )
->>>>>>> shelly_mittal
 
     return df
 
@@ -405,38 +308,6 @@ def create_hierarchy_features(
 def prepare_lightgbm_features(
     dataframe: pd.DataFrame,
 ) -> pd.DataFrame:
-<<<<<<< HEAD
-    """
-    Prepare the complete LightGBM feature dataset.
-
-    Features include:
-    - Calendar features
-    - Historical lag features
-    - Leakage-safe rolling features
-    - Price features
-    - Event indicators
-    """
-
-    df = create_calendar_features(
-        dataframe
-    )
-
-    df = create_lag_features(
-        df
-    )
-
-    df = create_rolling_features(
-        df
-    )
-
-    df = create_price_features(
-        df
-    )
-
-    df = create_event_features(
-        df
-    )
-=======
     """Prepare the complete Day 5 LightGBM feature dataset."""
 
     df = create_calendar_features(dataframe)
@@ -445,12 +316,10 @@ def prepare_lightgbm_features(
     df = create_price_features(df)
     df = create_event_features(df)
     df = create_hierarchy_features(df)
->>>>>>> shelly_mittal
 
     return df
 
 
-<<<<<<< HEAD
 def get_lightgbm_feature_columns(
     dataframe: pd.DataFrame,
 ) -> list[str]:
@@ -485,37 +354,3 @@ def get_lightgbm_feature_columns(
         for column in base_features + optional_features
         if column in dataframe.columns
     ]
-=======
-def get_feature_columns(
-    dataframe: pd.DataFrame,
-) -> list[str]:
-    """Return numeric features suitable for LightGBM."""
-
-    excluded_columns = {
-        "date",
-        "sales",
-        "item_id",
-        "dept_id",
-        "cat_id",
-        "store_id",
-        "state_id",
-        "event",
-        "event_type",
-    }
-
-    features = [
-        column
-        for column in dataframe.columns
-        if column not in excluded_columns
-        and pd.api.types.is_numeric_dtype(
-            dataframe[column]
-        )
-    ]
-
-    if not features:
-        raise ValueError(
-            "No numeric LightGBM features were found."
-        )
-
-    return features
->>>>>>> shelly_mittal
