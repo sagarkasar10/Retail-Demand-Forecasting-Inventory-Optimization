@@ -45,7 +45,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          pytest tests -v --disable-warnings
+          python -m pytest tests -v --disable-warnings
 
       - name: Check Python syntax
         run: |
