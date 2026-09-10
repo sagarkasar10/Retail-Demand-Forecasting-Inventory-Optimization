@@ -126,3 +126,4 @@ def validate_model_comparison(
         raise ValueError(
             "WAPE cannot contain negative values."
         )
+    
