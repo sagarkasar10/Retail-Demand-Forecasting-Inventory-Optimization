@@ -16,7 +16,7 @@ def get_bigquery_client():
     GOOGLE_CLOUD_PROJECT environment variable.
     """
 
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+    project_id = os.environ.get("GCP_PROJECT_ID") or os.environ["GOOGLE_CLOUD_PROJECT"]
 
     if not project_id:
         raise ValueError(

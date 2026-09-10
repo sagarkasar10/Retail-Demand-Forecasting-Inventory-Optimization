@@ -12,7 +12,7 @@ calendar_days AS (
         date
     FROM {{ ref('int_sales_calendar_mapping') }}
     
-)
+),
 
 sales_json AS (
 

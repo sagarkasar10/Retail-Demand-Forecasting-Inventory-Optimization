@@ -39,7 +39,7 @@ def test_inventory_calculation_with_forecast_data():
         safety_stock_days=1,
     )
 
-    assert result["forecast_demand"] == 60.0
+    assert result["total_forecast_demand"] == 60.0
     assert result["average_daily_demand"] == 20.0
     assert result["lead_time_demand"] == 40.0
     assert result["safety_stock"] == 20.0
@@ -62,9 +62,11 @@ def test_empty_forecast_returns_zero_metrics():
     result = calculate_inventory_metrics(
         forecast_df=forecast_df,
         current_stock=100,
+        lead_time_days=2,
+        safety_stock_days=1,
     )
 
-    assert result["forecast_demand"] == 0.0
+    assert result["total_forecast_demand"] == 0.0
     assert result["recommended_order_quantity"] == 0.0
     assert result["stockout_risk"] is False
 

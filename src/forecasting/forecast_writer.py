@@ -160,9 +160,7 @@ def get_bigquery_client(
 ) -> bigquery.Client:
     """Create a BigQuery client."""
 
-    project_id = project_id or os.getenv(
-        "GCP_PROJECT_ID"
-    )
+    project_id = os.environ.get("GCP_PROJECT_ID") or os.environ["GOOGLE_CLOUD_PROJECT"]
 
     if not project_id:
         return bigquery.Client()
@@ -210,9 +208,7 @@ def write_forecasts(
             "Forecast dataframe cannot be empty."
         )
 
-    project_id = project_id or os.getenv(
-        "GCP_PROJECT_ID"
-    )
+    project_id = project_id or os.environ.get("GCP_PROJECT_ID") or os.environ["GOOGLE_CLOUD_PROJECT"]
 
     dataset_id = dataset_id or os.getenv(
         "BIGQUERY_FORECAST_DATASET",
@@ -359,11 +355,9 @@ def write_metrics(
             "Metrics dataframe cannot be empty."
         )
 
-    project_id = project_id or os.getenv(
-        "GCP_PROJECT_ID"
-    )
+    project_id = project_id or os.environ.get("GCP_PROJECT_ID") or os.environ["GOOGLE_CLOUD_PROJECT"]
 
-    dataset_id = dataset_id or os.getenv(
+    dataset_id = dataset_id or os.environ.get(
         "BIGQUERY_FORECAST_DATASET",
         DEFAULT_DATASET,
     )
@@ -477,11 +471,9 @@ def write_model_run(
             "status is required."
         )
 
-    project_id = project_id or os.getenv(
-        "GCP_PROJECT_ID"
-    )
+    project_id = os.environ.get("GCP_PROJECT_ID") or os.environ["GOOGLE_CLOUD_PROJECT"]
 
-    dataset_id = dataset_id or os.getenv(
+    dataset_id = dataset_id or os.environ.get(
         "BIGQUERY_FORECAST_DATASET",
         DEFAULT_DATASET,
     )

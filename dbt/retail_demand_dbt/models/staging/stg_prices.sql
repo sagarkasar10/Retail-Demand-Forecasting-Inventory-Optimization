@@ -7,7 +7,7 @@ WITH source_prices AS (
         SAFE_CAST(sell_price AS FLOAT64) AS sell_price
     FROM {{ source('retail_demand', 'raw_prices') }}
 
-)
+),
 clean_prices AS (
 
     SELECT

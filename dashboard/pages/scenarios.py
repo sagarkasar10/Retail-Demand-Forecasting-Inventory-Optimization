@@ -5,7 +5,7 @@ from src.dashboard.data_access import (
     get_available_items,
 )
 
-from src.dashboard.scenario_data_service import (
+from src.dashboard.scenario_data_services import (
     get_scenario_base_data,
     get_historical_sales_for_scenario,
     get_latest_product_price,
@@ -26,6 +26,11 @@ from src.dashboard.scenario_inventory_service import (
     create_scenario_stock_projection,
 )
 
+from src.dashboard.scenario_report_service import (
+    generate_scenario_summary,
+    create_scenario_report_dataframe,
+    create_scenario_filename,
+)
 
 def render_price_scenario(
     forecast_df,
@@ -402,5 +407,5 @@ def render_scenarios():
             st.exception(exc)
 
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     render_scenarios()

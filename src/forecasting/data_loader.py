@@ -16,7 +16,7 @@ def get_bigquery_client() -> bigquery.Client:
     GOOGLE_APPLICATION_CREDENTIALS or the active Google Cloud
     authentication environment.
     """
-    project_id = os.getenv("GCP_PROJECT_ID")
+    project_id = os.environ.get("GCP_PROJECT_ID") or os.environ["GOOGLE_CLOUD_PROJECT"]
 
     if project_id:
         return bigquery.Client(project=project_id)
@@ -36,8 +36,8 @@ def load_daily_sales(
         <project_id>.<dataset_id>.fct_daily_sales
     """
 
-    project_id = project_id or os.getenv("GCP_PROJECT_ID")
-    dataset_id = dataset_id or os.getenv(
+    project_id = project_id or os.environ.get("GCP_PROJECT_ID")
+    dataset_id = dataset_id or os.environ.get(
         "BIGQUERY_MART_DATASET",
         "retail_demand_marts",
     )
