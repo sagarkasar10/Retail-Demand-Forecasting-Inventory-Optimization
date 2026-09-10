@@ -297,6 +297,62 @@ def validate_daily_sales(dataframe: pd.DataFrame) -> None:
         raise ValueError("Daily sales contains negative sales values.")
 
 
+def get_top_item_store_series(
+    dataframe: pd.DataFrame,
+    top_n: int = 5,
+) -> pd.DataFrame:
+    """Return the top item-store combinations by total sales."""
+
+    if not isinstance(top_n, int) or top_n <= 0:
+        raise ValueError(
+            "top_n must be a positive integer."
+        )
+
+    required_columns = {
+        "item_id",
+        "store_id",
+        "sales",
+    }
+
+    missing_columns = required_columns - set(
+        dataframe.columns
+    )
+
+    if missing_columns:
+        raise ValueError(
+            f"Missing required columns: {sorted(missing_columns)}"
+        )
+
+    if dataframe.empty:
+        raise ValueError(
+            "Cannot rank item-store series from an empty dataframe."
+        )
+
+    ranking = (
+        dataframe.copy()
+        .assign(
+            sales=pd.to_numeric(
+                dataframe["sales"],
+                errors="coerce",
+            )
+        )
+        .dropna(subset=["sales"])
+        .groupby(
+            ["item_id", "store_id"],
+            as_index=False,
+        )["sales"]
+        .sum()
+        .sort_values(
+            "sales",
+            ascending=False,
+        )
+        .head(top_n)
+        .reset_index(drop=True)
+    )
+
+    return ranking   
+
+
 if __name__ == "__main__":
     df = load_daily_sales()
     validate_daily_sales(df)
@@ -305,3 +361,7 @@ if __name__ == "__main__":
     print(f"Rows: {len(df)}")
     print(f"Columns: {list(df.columns)}")
     print(f"Date range: {df['date'].min()} to {df['date'].max()}")
+    print(f"Top item-store combinations:")
+    print(get_top_item_store_series(df, top_n=5))
+
+    
