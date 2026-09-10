@@ -54,8 +54,7 @@ def test_apply_price_scenario(forecast_df):
     assert "scenario_revenue" in result.columns
 
     assert result["scenario_price"].iloc[0] == 90
-
-    assert result["scenario_demand"].iloc[0] == 110
+    assert result["scenario_demand"].iloc[0] == pytest.approx(110)
 
 
 def test_price_reduction_increases_demand(forecast_df):

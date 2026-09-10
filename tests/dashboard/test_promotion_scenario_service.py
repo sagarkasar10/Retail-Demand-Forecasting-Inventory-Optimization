@@ -31,8 +31,8 @@ def test_apply_promotion_scenario(forecast_df):
     assert "scenario_demand" in result.columns
     assert "additional_demand" in result.columns
 
-    assert result["scenario_demand"].iloc[0] == 110
-    assert result["additional_demand"].iloc[0] == 10
+    assert result["scenario_demand"].iloc[0] == pytest.approx(110)
+    assert result["additional_demand"].iloc[0] == pytest.approx(10)
 
 
 def test_promotion_increases_demand(forecast_df):
