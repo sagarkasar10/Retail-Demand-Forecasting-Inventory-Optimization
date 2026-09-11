@@ -398,10 +398,247 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+def run_forecasting_pipeline():
+    """Run the Week 3 Day 5 LightGBM pipeline."""
+
+    logger.info(
+        "Starting Week 3 Day 5 LightGBM pipeline."
+    )
+
+    daily_sales = load_daily_sales()
+
+    validate_daily_sales(
+        daily_sales
+    )
+
+    logger.info(
+        "Loaded %s sales rows.",
+        len(daily_sales),
+    )
+
+    train_df, validation_df, test_df = chronological_split(
+        daily_sales,
+        validation_days=30,
+        test_days=30,
+    )
+
+    logger.info(
+        "Data split: %s",
+        get_split_summary(
+            train_df,
+            validation_df,
+            test_df,
+        ),
+    )
+
+    logger.info(
+        "Creating LightGBM training features."
+    )
+
+    train_features = prepare_lightgbm_features(
+        train_df
+    )
+
+    train_features = train_features.dropna(
+        subset=["sales"]
+    )
+
+    feature_columns = get_feature_columns(
+        train_features
+    )
+
+    train_features = train_features.dropna(
+        subset=feature_columns + ["sales"]
+    )
+
+    if train_features.empty:
+        raise ValueError(
+            "No valid LightGBM training rows available."
+        )
+
+    logger.info(
+        "LightGBM feature count: %s",
+        len(feature_columns),
+    )
+
+    logger.info(
+        "Creating validation features."
+    )
+
+    history_until_validation = daily_sales[
+        daily_sales["date"]
+        <= validation_df["date"].max()
+    ].copy()
+
+    validation_features = prepare_lightgbm_features(
+        history_until_validation
+    )
+
+    validation_dates = set(
+        validation_df["date"].dt.normalize()
+    )
+
+    validation_features = validation_features[
+        validation_features["date"]
+        .dt.normalize()
+        .isin(validation_dates)
+    ].copy()
+
+    validation_features = validation_features.dropna(
+        subset=feature_columns + ["sales"]
+    )
+
+    if validation_features.empty:
+        raise ValueError(
+            "No valid LightGBM validation rows available."
+        )
+
+    logger.info(
+        "Tuning LightGBM parameters."
+    )
+
+    best_model, tuning_results = tune_lightgbm(
+        train_df=train_features,
+        validation_df=validation_features,
+        feature_columns=feature_columns,
+    )
+
+    best_parameters = get_best_parameters(
+        tuning_results
+    )
+
+    logger.info(
+        "Best LightGBM parameters: %s",
+        best_parameters,
+    )
+
+    logger.info(
+        "LightGBM tuning results:\n%s",
+        tuning_results.to_string(index=False),
+    )
+
+    validation_predictions = predict_lightgbm(
+        best_model,
+        validation_features,
+        feature_columns,
+    )
+
+    validation_metrics = evaluate_model_predictions(
+        validation_features["sales"],
+        validation_predictions,
+        "LightGBM",
+    )
+
+    logger.info(
+        "LightGBM validation metrics: %s",
+        validation_metrics,
+    )
+
+    validation_output = create_lightgbm_forecast_output(
+        validation_features,
+        validation_predictions,
+        model_name="LightGBM",
+    )
+
+    validate_forecast_output(
+        validation_output
+    )
+
+    logger.info(
+        "Validation forecast summary: %s",
+        calculate_forecast_summary(
+            validation_output
+        ),
+    )
+
+    logger.info(
+        "Preparing test forecast features."
+    )
+
+    history_until_test = daily_sales[
+        daily_sales["date"]
+        <= test_df["date"].max()
+    ].copy()
+
+    test_features = prepare_lightgbm_features(
+        history_until_test
+    )
+
+    test_dates = set(
+        test_df["date"].dt.normalize()
+    )
+
+    test_features = test_features[
+        test_features["date"]
+        .dt.normalize()
+        .isin(test_dates)
+    ].copy()
+
+    test_features = test_features.dropna(
+        subset=feature_columns + ["sales"]
+    )
+
+    if test_features.empty:
+        raise ValueError(
+            "No valid LightGBM test rows available."
+        )
+
+    test_predictions = predict_lightgbm(
+        best_model,
+        test_features,
+        feature_columns,
+    )
+
+    test_metrics = evaluate_model_predictions(
+        test_features["sales"],
+        test_predictions,
+        "LightGBM",
+    )
+
+    logger.info(
+        "LightGBM test metrics: %s",
+        test_metrics,
+    )
+
+    test_output = create_lightgbm_forecast_output(
+        test_features,
+        test_predictions,
+        model_name="LightGBM",
+    )
+
+    validate_forecast_output(
+        test_output
+    )
+
+    logger.info(
+        "Test forecast summary: %s",
+        calculate_forecast_summary(
+            test_output
+        ),
+    )
+
+    logger.info(
+        "Week 3 Day 5 LightGBM pipeline completed."
+    )
+
+    return {
+        "model": best_model,
+        "best_parameters": best_parameters,
+        "tuning_results": tuning_results,
+        "validation_metrics": validation_metrics,
+        "test_metrics": test_metrics,
+        "validation_forecast": validation_output,
+        "test_forecast": test_output,
+        "feature_columns": feature_columns,
+        "train": train_features,
+        "validation": validation_features,
+        "test": test_features,
+    }
+
 
 if __name__ == "__main__":
     main()
-   
+    run_forecasting_pipeline()
     
     
     
