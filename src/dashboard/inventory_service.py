@@ -37,11 +37,13 @@ def prepare_forecast_demand(
     inventory calculations always use the final daily forecast.
     """
 
-    if forecast_df is None or forecast_df.empty:
-        raise ValueError(
-            "Forecast data cannot be empty."
-        )
+    if forecast_df is None:
+        raise ValueError("Forecast data cannot be None.")
 
+    if forecast_df.empty:
+        return pd.DataFrame(columns=["forecast_date", "predicted_demand"])
+
+    
     required_columns = {
         "forecast_date",
         "predicted_demand",
@@ -135,6 +137,14 @@ def calculate_inventory_metrics(
         Stockout Risk =
             Current Stock <= Reorder Point
     """
+    if forecast_df is None or forecast_df.empty:
+        return {
+            "total_forecast_demand": 0.0,
+            "recommended_order_quantity": 0.0,
+            "reorder_point": 0.0,
+            "safety_stock": 0.0,
+            "stockout_risk": False,
+        }
 
     validate_inventory_inputs(
         current_stock=current_stock,
