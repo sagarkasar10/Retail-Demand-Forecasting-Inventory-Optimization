@@ -39,7 +39,7 @@ def load_daily_sales(
     project_id = project_id or os.environ.get("GCP_PROJECT_ID")
     dataset_id = dataset_id or os.environ.get(
         "BIGQUERY_MART_DATASET",
-        "retail_demand_marts",
+        "retail_demand",
     )
 
     if not project_id:
