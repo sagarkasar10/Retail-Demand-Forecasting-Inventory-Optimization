@@ -10,31 +10,62 @@ load_dotenv()
 
 def get_bigquery_client():
     """
-    Create and return a BigQuery client.
-
-    The Google Cloud project ID is read from the
-    GOOGLE_CLOUD_PROJECT environment variable.
+    Create and return an authenticated BigQuery client.
     """
 
-    project_id = os.environ.get("GCP_PROJECT_ID") or os.environ["GOOGLE_CLOUD_PROJECT"]
+    project_id = (
+        os.getenv("GCP_PROJECT_ID")
+        or os.getenv("GOOGLE_CLOUD_PROJECT")
+    )
+
+    credentials_path = os.getenv(
+        "GOOGLE_APPLICATION_CREDENTIALS"
+    )
 
     if not project_id:
         raise ValueError(
-            "GOOGLE_CLOUD_PROJECT is not configured in the .env file."
+            "BigQuery project ID is missing. "
+            "Set GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT in .env."
+        )
+
+    if credentials_path:
+
+        if not os.path.exists(credentials_path):
+            raise FileNotFoundError(
+                "Google service account credentials file was not found: "
+                f"{credentials_path}"
+            )
+
+        print(
+            "✓ Google credentials file found: "
+            f"{credentials_path}"
+        )
+
+    else:
+        print(
+            "⚠ GOOGLE_APPLICATION_CREDENTIALS is not set. "
+            "Trying Application Default Credentials."
         )
 
     try:
-        client = bigquery.Client(project=project_id)
 
-        print(f"✓ BigQuery client created for project: {project_id}")
+        client = bigquery.Client(
+            project=project_id
+        )
+
+        print(
+            f"✓ BigQuery client created successfully "
+            f"for project: {client.project}"
+        )
 
         return client
 
     except Exception as exc:
-        raise RuntimeError(
-            f"Failed to create BigQuery client: {exc}"
-        ) from exc
 
+        raise RuntimeError(
+            "Failed to authenticate with Google BigQuery. "
+            f"Original error: {exc}"
+        ) from exc
 
 def create_dataset_if_not_exists(
     client,

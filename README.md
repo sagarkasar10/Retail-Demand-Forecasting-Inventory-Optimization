@@ -112,15 +112,29 @@ pip install -r requirements.txt
 
 ---
 
-Configuration
+## Configuration
 
-Create a .env file:
+Create a `.env` file in the project root:
 
-GCP_PROJECT_ID=your-project-id
-BIGQUERY_DATASET=retail_demand
+GCP_PROJECT_ID=your-google-cloud-project-id
+GOOGLE_CLOUD_PROJECT=your-google-cloud-project-id
+
+GOOGLE_APPLICATION_CREDENTIALS=C:/path/to/service-account-key.json
+
+BIGQUERY_LOCATION=US
+
+MARTS_DATASET=retail_demand
+BIGQUERY_MART_DATASET=retail_demand
+
+FORECAST_DATASET=retail_demand_forecasting
+BIGQUERY_FORECAST_DATASET=retail_demand_forecasting
+
+DAILY_SALES_TABLE=daily_sales
 FORECAST_TABLE=forecast_results
+METRICS_TABLE=forecast_metrics
+MODEL_RUNS_TABLE=model_runs
 
-Do not commit the .env file.
+Never commit the `.env` file or service account credentials to Git.
 
 
 ---
